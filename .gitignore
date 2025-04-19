@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/*
+.idea/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Optional files
+*.vsix
+
+# Coverage directory
+coverage/
+
+# yarn
+yarn.lock
+
+# Quickstart
+vsc-extension-quickstart.md
