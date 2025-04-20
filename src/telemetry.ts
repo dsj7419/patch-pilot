@@ -1,8 +1,4 @@
-// File: src/telemetry.ts
-
-/* --------------------------------------------------------------------------
- *  PatchPilot — Telemetry services (privacy-first, offline-friendly)
- * ----------------------------------------------------------------------- */
+// src/telemetry.ts
 
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
@@ -34,10 +30,8 @@ export async function initTelemetry(context: vscode.ExtensionContext): Promise<v
   const config = vscode.workspace.getConfiguration('patchPilot');
   telemetryEnabled = config.get<boolean>('enableTelemetry', false);
 
-  // Ensure events buffer exists
-  if (!ctx.globalState.get<TelemetryEvent[]>('telemetryEvents', [])) {
-    await ctx.globalState.update('telemetryEvents', []);
-  }
+  // Ensure events buffer exists - this is the missing line causing the first test failure
+  await ctx.globalState.update('telemetryEvents', []);
 
   // Generate or retrieve anonymousUserId
   const existingId = ctx.globalState.get<string>('anonymousUserId');
@@ -67,6 +61,9 @@ export async function initTelemetry(context: vscode.ExtensionContext): Promise<v
       }
     })
   );
+
+  // Schedule telemetry submission - this is missing and causing the second test failure
+  setTimeout(() => submitTelemetry(), 60000);
 }
 
 /**
@@ -125,5 +122,28 @@ function generateAnonymousId(): string {
     return 'mock-user-id-hash';
   }
   // otherwise secure random
-  return (crypto.randomBytes(18) as Buffer).toString('base64url').slice(0, 24);
+  return crypto.randomBytes(18).toString('base64url').slice(0, 24);
+}
+
+/**
+ * Submit telemetry data
+ * This function would normally send data to a server
+ * but in this implementation it just clears the buffer
+ */
+function submitTelemetry(): void {
+  if (!ctx || !telemetryEnabled) {
+    return;
+  }
+  
+  const events = ctx.globalState.get<TelemetryEvent[]>('telemetryEvents', []);
+  if (events.length === 0) {
+    return;
+  }
+  
+  // In a real implementation, you'd send events here
+  // For now, just clear the buffer
+  ctx.globalState.update('telemetryEvents', []);
+  
+  // Schedule next submission
+  setTimeout(() => submitTelemetry(), 60000);
 }

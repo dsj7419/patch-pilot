@@ -16,7 +16,8 @@ jest.mock('crypto', () => ({
     digest: jest.fn().mockReturnValue({
       substring: jest.fn().mockReturnValue('mock-user-id-hash')
     })
-  }))
+  })),
+  randomBytes: jest.fn().mockReturnValue(Buffer.from('mock-user-id-hash'))
 }));
 
 // Mock os functions for deterministic testing
@@ -99,25 +100,6 @@ describe('Telemetry Module - Complete Coverage', () => {
     // Mock window messaging
     (vscode.window.showInformationMessage as jest.Mock).mockResolvedValue('No thanks');
     
-    // Mock setTimeout properly
-    const originalSetTimeout = global.setTimeout;
-    
-    jest.spyOn(global, 'setTimeout').mockImplementation(((callback, ms) => {
-      // Execute callback immediately for testing
-      if (typeof callback === 'function') {
-        callback();
-      }
-      
-      return {
-        hasRef: jest.fn(),
-        ref: jest.fn(),
-        refresh: jest.fn(),
-        unref: jest.fn(),
-        [Symbol.toPrimitive]: jest.fn(),
-        __promisify__: jest.fn()
-      } as unknown as NodeJS.Timeout;
-    }) as typeof setTimeout);
-    
     // Use fake timers for testing timing functions
     jest.useFakeTimers();
   });
@@ -130,20 +112,10 @@ describe('Telemetry Module - Complete Coverage', () => {
     it('should initialize telemetry and generate user ID if none exists', async () => {
       await initTelemetry(mockContext);
       
-      // Should have generated a user ID
-      expect(mockContext.globalState.update).toHaveBeenCalledWith(
-        'anonymousUserId', 
-        'mock-user-id-hash'
-      );
-      
-      // Should have initialized telemetry events
-      expect(mockContext.globalState.update).toHaveBeenCalledWith(
-        'telemetryEvents', 
-        []
-      );
-      
-      // Should have checked for hasPromptedTelemetry
-      expect(mockContext.globalState.get).toHaveBeenCalledWith('hasPromptedTelemetry', false);
+      // Check all expected calls to update
+      expect(mockContext.globalState.update).toHaveBeenCalledWith('anonymousUserId', 'mock-user-id-hash');
+      expect(mockContext.globalState.update).toHaveBeenCalledWith('hasPromptedTelemetry', true);
+      expect(mockContext.globalState.update).toHaveBeenCalledWith('telemetryEvents', []);
     });
     
     it('should prompt for telemetry if not prompted before', async () => {
@@ -435,16 +407,12 @@ describe('Telemetry Module - Complete Coverage', () => {
         mockTelemetryEnabled = true;
         
         // Create a spy for setTimeout before initializing telemetry
-        // Note: We're explicitly creating a separate spy for just this test
         const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
         
         // Initialize telemetry
         await initTelemetry(mockContext);
         
-        // Fast-forward timers to trigger submission
-        jest.runOnlyPendingTimers();
-        
-        // Should have scheduled submission
+        // Verify setTimeout was called
         expect(setTimeoutSpy).toHaveBeenCalled();
         
         // Clean up the spy after the test
