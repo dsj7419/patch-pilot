@@ -1,16 +1,24 @@
 {
 	"compilerOptions": {
-		"module": "Node16",
-		"target": "ES2022",
-		"lib": [
-			"ES2022"
-		],
-		"sourceMap": true,
-		"rootDir": "src",
-		"strict": true,   /* enable all strict type-checking options */
-		/* Additional Checks */
-		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
-		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
-		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
+	  "module": "commonjs",
+	  "target": "ES2020",
+	  "outDir": "out",
+	  "lib": ["ES2020", "ES2022.Intl", "DOM"],
+	  "sourceMap": true,
+	  "rootDir": ".",
+	  "strict": true,
+	  "noImplicitReturns": true,
+	  "noFallthroughCasesInSwitch": true,
+	  "esModuleInterop": true,
+	  "resolveJsonModule": true,
+	  "skipLibCheck": true
+	},
+	"include": ["src/**/*.ts", "webview/**/*.ts"],
+	"exclude": ["src/test/**/*", "node_modules", ".vscode-test"],
+	"watchOptions": {
+	  "watchFile": "useFsEvents",
+	  "watchDirectory": "useFsEvents",
+	  "fallbackPolling": "dynamicPriority"
 	}
-}
+  }
+  

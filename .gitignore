@@ -26,6 +26,7 @@ Thumbs.db
 # Editor directories and files
 .vscode/*
 .idea/
+.vscode-test/*
 
 # Environment variables
 .env
@@ -43,3 +44,6 @@ yarn.lock
 
 # Quickstart
 vsc-extension-quickstart.md
+
+# repomix
+*repomix*

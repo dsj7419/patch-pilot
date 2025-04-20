@@ -1,49 +1,152 @@
 {
   "name": "patch-pilot",
   "displayName": "PatchPilot",
-  "description": "Description: Paste fuzzy unified diffs & apply with AI grade smarts",
-  "version": "0.0.1",
+  "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
+  "version": "0.1.0",
+  "publisher": "patchpilot",
   "engines": {
-    "vscode": "^1.99.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "SCM Providers",
+    "Formatters"
   ],
-  "activationEvents": [],
-  "main": "./dist/extension.js",
+  "keywords": [
+    "patch",
+    "diff",
+    "git",
+    "ai",
+    "llm"
+  ],
+  "aiAssisted": true,
+  "preview": true,
+  "icon": "media/logo.png",
+  "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "patch-pilot.helloWorld",
-        "title": "Hello World"
+        "command": "patchPilot.pasteDiff",
+        "title": "PatchPilot: Paste Diff"
+      },
+      {
+        "command": "patchPilot.applySelectedDiff",
+        "title": "PatchPilot: Apply Selected Diff"
+      },
+      {
+        "command": "patchPilot.createBranch",
+        "title": "PatchPilot: Create Branch for Patch"
+      }
+    ],
+    "configuration": {
+      "title": "PatchPilot",
+      "properties": {
+        "patchPilot.autoStage": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically stage files to Git after applying patches"
+        },
+        "patchPilot.fuzzFactor": {
+          "type": "number",
+          "default": 2,
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "description": "Fuzz factor for matching context lines (0-3, higher values allow more flexible matching)"
+        },
+        "patchPilot.enableTelemetry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable anonymous telemetry to help improve PatchPilot"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "patchPilot.pasteDiff",
+          "group": "navigation",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "patchPilot.applySelectedDiff",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "patchPilot.pasteDiff",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorTextFocus"
       }
     ]
   },
   "scripts": {
-    "vscode:prepublish": "yarn run package",
-    "compile": "yarn run check-types && yarn run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
-    "watch:esbuild": "node esbuild.js --watch",
-    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "yarn run check-types && yarn run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
-    "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "vscode:prepublish": "yarn compile",
+    "compile": "tsc -p ./ && node build-webview.js",
+    "watch": "tsc -watch -p ./",
+    "build:webview": "node build-webview.js",
+    "watch:webview": "node build-webview.js --watch",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "postinstall": "node -e \"try{require('vscode/bin/install')}catch(e){}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest src/test/unit",
+    "test:utilities": "jest src/test/unit/utilities",
+    "test:strategies": "jest src/test/unit/strategies",
+    "test:integration": "jest src/test/integration",
+    "test:e2e": "jest src/test/e2e"
   },
   "devDependencies": {
-    "@types/vscode": "^1.99.0",
+    "@types/chai": "^5.2.1",
+    "@types/diff": "^5.0.3",
+    "@types/glob": "^8.1.0",
+    "@types/jest": "^29.5.14",
     "@types/mocha": "^10.0.10",
-    "@types/node": "20.x",
-    "@typescript-eslint/eslint-plugin": "^8.28.0",
-    "@typescript-eslint/parser": "^8.28.0",
-    "eslint": "^9.23.0",
-    "esbuild": "^0.25.1",
-    "npm-run-all": "^4.1.5",
-    "typescript": "^5.8.2",
+    "@types/node": "16.x",
+    "@types/sinon": "^17.0.4",
+    "@types/vscode": "^1.99.1",
+    "@typescript-eslint/eslint-plugin": "^8.30.1",
+    "@typescript-eslint/parser": "^8.30.1",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
-  }
+    "@vscode/test-electron": "^2.5.2",
+    "chai": "^5.2.0",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.20.0",
+    "eslint": "^9.25.0",
+    "glob": "^8.1.0",
+    "istanbul": "^0.4.5",
+    "jest": "^29.7.0",
+    "jest-extended": "^4.0.2",
+    "jsonc-eslint-parser": "^2.4.0",
+    "mocha": "^11.1.0",
+    "nyc": "^17.1.0",
+    "sinon": "^20.0.0",
+    "source-map-support": "^0.5.21",
+    "ts-jest": "^29.3.2",
+    "typescript": "~5.1.6",
+    "vsce": "^2.15.0",
+    "vscode-test": "^1.6.1"
+  },
+  "dependencies": {
+    "diff": "^5.1.0",
+    "simple-git": "^3.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dsj7419/patch-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dsj7419/patch-pilot/issues"
+  },
+  "license": "MIT"
 }
