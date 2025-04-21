@@ -47,3 +47,8 @@ vsc-extension-quickstart.md
 
 # repomix
 *repomix*
+
+# benchmark files
+comparison-benchmark-results.json
+optimized-benchmark-results.json
+performance-results.json

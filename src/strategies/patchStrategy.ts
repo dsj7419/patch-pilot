@@ -257,4 +257,29 @@ export class PatchStrategyFactory {
       new GreedyStrategy()
     ]);
   }
+
+  /**
+   * Creates a strict strategy
+   * @returns A strict matching strategy
+   */
+  static createStrictStrategy(): PatchStrategy {
+    return new StrictStrategy();
+  }
+
+  /**
+   * Creates a shifted strategy with the specified fuzz factor
+   * @param fuzzFactor The fuzz factor for matching
+   * @returns A shifted header strategy
+   */
+  static createShiftedStrategy(fuzzFactor: 0 | 1 | 2 | 3): PatchStrategy {
+    return new ShiftedHeaderStrategy(fuzzFactor);
+  }
+
+  /**
+   * Creates a greedy strategy
+   * @returns A greedy matching strategy
+   */
+  static createGreedyStrategy(): PatchStrategy {
+    return new GreedyStrategy();
+  }
 }

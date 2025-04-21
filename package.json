@@ -61,6 +61,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable anonymous telemetry to help improve PatchPilot"
+        },
+        "patchPilot.mtimeCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check file modification time before applying patches to prevent silent overwrites"
         }
       }
     },
@@ -104,7 +109,14 @@
     "test:utilities": "jest src/test/unit/utilities",
     "test:strategies": "jest src/test/unit/strategies",
     "test:integration": "jest src/test/integration",
-    "test:e2e": "jest src/test/e2e"
+    "test:e2e": "jest src/test/e2e",
+    "benchmark": "npx ts-node src/test/benchmark/benchmarkRunner.ts",
+    "benchmark:optimized": "npx ts-node src/test/benchmark/benchmarkRunner.ts optimized",
+    "benchmark:compare": "npx ts-node src/test/benchmark/benchmarkRunner.ts compare",
+    "benchmark:generate": "npx ts-node src/test/benchmark/benchmarkRunner.ts generate",
+    "benchmark:enhanced": "npx ts-node src/test/benchmark/enhancedBenchmarkSuite.ts",
+    "benchmark:memory": "npx ts-node src/test/benchmark/enhancedBenchmarkSuite.ts 100,500,1000 3 true",
+    "benchmark:large": "npx ts-node src/test/benchmark/enhancedBenchmarkSuite.ts 1000,2000,5000 1 false"
   },
   "devDependencies": {
     "@types/chai": "^5.2.1",
@@ -133,6 +145,7 @@
     "sinon": "^20.0.0",
     "source-map-support": "^0.5.21",
     "ts-jest": "^29.3.2",
+    "ts-node": "^10.9.2",
     "typescript": "~5.1.6",
     "vsce": "^2.15.0",
     "vscode-test": "^1.6.1"

@@ -437,6 +437,60 @@ describe('Apply Patch Module', () => {
         reason: 'User cancelled after preview'
       });
     });
+
+    it('should detect file modification during patch application when mtimeCheck is enabled', async () => {
+        // Reset mocks first
+        jest.clearAllMocks();
+        
+        // Setup to capture all fs.stat calls
+        const mockStatFunction = jest.fn();
+        
+        // First call (in resolveWorkspaceFile) - file exists
+        mockStatFunction.mockResolvedValueOnce({ type: vscode.FileType.File });
+        
+        // Second call (our initial mtime check) - initial timestamp 
+        mockStatFunction.mockResolvedValueOnce({ mtime: 1000 });
+        
+        // Third call (our verification check) - changed timestamp
+        mockStatFunction.mockResolvedValueOnce({ mtime: 2000 });
+        
+        // Override the vscode.workspace.fs.stat mock
+        (vscode.workspace.fs.stat as jest.Mock) = mockStatFunction;
+        
+        // Mock UI to simulate user cancelling the overwrite
+        (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue('Cancel');
+        
+        // Mock patch resolution
+        (DiffLib.parsePatch as jest.Mock).mockReturnValue([
+          createMockParsedPatch({
+            oldFileName: 'a/src/file.ts',
+            newFileName: 'b/src/file.ts'
+          })
+        ]);
+        
+        // Mock patch application
+        (PatchStrategyFactory.createDefaultStrategy as jest.Mock)().apply.mockReturnValue({
+          success: true,
+          patched: 'patched content',
+          strategy: 'test-strategy'
+        });
+        
+        // Apply with mtimeCheck enabled
+        const results = await applyPatch(WELL_FORMED_DIFF, { 
+          preview: false,
+          mtimeCheck: true 
+        });
+        
+        // Verify stat was called exactly 3 times (resolveFile, initial check, changed check)
+        expect(mockStatFunction).toHaveBeenCalledTimes(3);
+        
+        // Should have failed due to mtime change
+        expect(results[0]).toMatchObject({
+          file: 'src/file.ts',
+          status: 'failed',
+          reason: 'File modified externally, update aborted'
+        });
+      });
     
     it('should handle file not found', async () => {
       // Reset mocks to default behavior first

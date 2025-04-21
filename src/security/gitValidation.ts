@@ -1,0 +1,348 @@
+// src/security/gitValidation.ts
+
+import * as path from 'path';
+import * as vscode from 'vscode';
+
+/**
+ * Validates if a string is a safe Git branch name
+ * Enhanced to follow stricter Git branch naming rules and prevent command injection
+ * 
+ * @param name The branch name to validate
+ * @returns True if the branch name is valid and safe, false otherwise
+ */
+export function isValidBranchName(name: string): boolean {
+  if (!name || typeof name !== 'string') {
+    return false;
+  }
+  
+  // Git branch naming rules (enhanced):
+  // Cannot have ASCII control characters (0-31) or DEL (127)
+  // Cannot have: space, ~, ^, :, ?, *, [, \, |, &, ;, <, >, `, $, (), {}, or multiple consecutive dots
+  // Cannot begin with a dot, forward slash, dash, or underscore
+  // Cannot end with .lock or .swp
+  // Cannot contain a double dot ".."
+  // Cannot contain "@{" sequence (used in reflog)
+  // Maximum length is 255 characters (git constraint)
+  // Cannot be "HEAD", "FETCH_HEAD", etc. (reserved names)
+  
+  const MAX_BRANCH_LENGTH = 255;
+  const RESERVED_NAMES = [
+    'HEAD', 'FETCH_HEAD', 'ORIG_HEAD', 'MERGE_HEAD', 
+    'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'REBASE_HEAD'
+  ];
+  
+  return (
+    // Basic length check
+    name.length <= MAX_BRANCH_LENGTH &&
+    // Not a reserved name
+    !RESERVED_NAMES.includes(name.toUpperCase()) &&
+    // Basic syntax check - more strict than before
+    /^[^\s~^:?*[\\\0-\x1F\x7F|&;<>`$(){}\[\]]+$/i.test(name) &&
+    // No double dots
+    !name.includes('..') &&
+    // Cannot start with . / - or _
+    !/^[.\/_-]/.test(name) &&
+    // Cannot end with .lock or .swp
+    !/\.(lock|swp)$/.test(name) &&
+    // Cannot contain reflog expression
+    !name.includes('@{')
+  );
+}
+
+/**
+ * Sanitizes a branch name to make it Git-safe with enhanced rules
+ * 
+ * @param name The branch name to sanitize
+ * @returns A sanitized version of the branch name
+ */
+export function sanitizeBranchName(name: string): string {
+  if (!name || typeof name !== 'string') {
+    return 'unnamed-branch';
+  }
+  
+  // Replace invalid characters with hyphens - more strict than before
+  let sanitized = name
+    .replace(/[\s~^:?*[\\\0-\x1F\x7F|&;<>`$(){}\[\]]/g, '-')
+    .replace(/\.\./g, '-')
+    .replace(/@\{/g, '-at-')
+    .replace(/\.(lock|swp)$/, '-$1');
+  
+  // Remove leading . / - or _
+  sanitized = sanitized.replace(/^[.\/_-]+/, '');
+  
+  // Ensure length is within limit
+  const MAX_BRANCH_LENGTH = 255;
+  if (sanitized.length > MAX_BRANCH_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_BRANCH_LENGTH);
+  }
+  
+  // Replace reserved names
+  const RESERVED_NAMES = [
+    'HEAD', 'FETCH_HEAD', 'ORIG_HEAD', 'MERGE_HEAD', 
+    'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'REBASE_HEAD'
+  ];
+  
+  if (RESERVED_NAMES.includes(sanitized.toUpperCase())) {
+    sanitized = `branch-${sanitized}`;
+  }
+  
+  // If empty after sanitization, use a default name
+  if (!sanitized) {
+    return 'unnamed-branch';
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Validates a file path to ensure it's safe to use with Git operations
+ * Enhanced to check against directory traversal, symlink attacks, and unsafe paths
+ * 
+ * @param filePath The file path to validate
+ * @param workspacePath The base workspace path for validation
+ * @returns True if the path is valid and within the workspace
+ */
+export function isValidFilePath(filePath: string, workspacePath: string): boolean {
+  if (!filePath || typeof filePath !== 'string' || !workspacePath) {
+    return false;
+  }
+  
+  try {
+    // Normalize and resolve to absolute path
+    const normalizedPath = path.normalize(filePath);
+    
+    // Get absolute path - handle both relative and absolute input paths
+    const absolutePath = path.isAbsolute(normalizedPath) 
+      ? normalizedPath 
+      : path.resolve(workspacePath, normalizedPath);
+    
+    // Get normalized workspace path
+    const normalizedWorkspacePath = path.normalize(workspacePath);
+    
+    // Ensure path is within workspace (prevent directory traversal)
+    const relativePath = path.relative(normalizedWorkspacePath, absolutePath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      return false;
+    }
+    
+    // Check for unsafe path patterns
+    if (/\\\\|\/\/|\.\.\/|~\/|\$|%|&|\||;|>|<|`|\(|\)|\{|\}|\[|\]/.test(relativePath)) {
+      return false;
+    }
+    
+    // Check for null bytes and control characters
+    if (/[\0-\x1F]/.test(relativePath)) {
+      return false;
+    }
+    
+    // Check for extremely long paths that might cause issues
+    if (relativePath.length > 1000) {
+      return false;
+    }
+    
+    // Only allow certain file extensions for safety
+    // NOTE: Uncomment and customize if you want to restrict file types
+    /*
+    const allowedExtensions = ['.txt', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.json', '.md'];
+    const fileExt = path.extname(relativePath).toLowerCase();
+    if (!allowedExtensions.includes(fileExt)) {
+      return false;
+    }
+    */
+    
+    return true;
+  } catch (err) {
+    // Any path manipulation errors indicate an invalid path
+    return false;
+  }
+}
+
+/**
+ * Validates and sanitizes an array of file paths for Git operations
+ * Enhanced to support workspace-scoped validation and more rigorous filtering
+ * 
+ * @param filePaths Array of file paths to validate
+ * @returns An array of valid and sanitized file paths
+ */
+export function validateFilePaths(filePaths: string[]): string[] {
+  // Get workspace folders for validation context
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders || workspaceFolders.length === 0) {
+    return [];
+  }
+  
+  const workspacePath = workspaceFolders[0].uri.fsPath;
+  
+  // Filter out invalid paths and sanitize the rest
+  return filePaths
+    .filter(filePath => typeof filePath === 'string' && filePath.trim().length > 0)
+    .filter(filePath => isValidFilePath(filePath, workspacePath))
+    .map(filePath => path.normalize(filePath));
+}
+
+/**
+ * Validates a commit message to prevent command injection and other issues
+ * Enhanced to detect more potential security issues
+ * 
+ * @param message The commit message to validate
+ * @returns True if the commit message is safe, false otherwise
+ */
+export function isValidCommitMessage(message: string): boolean {
+  if (!message || typeof message !== 'string') {
+    return false;
+  }
+  
+  // Enhanced checks for potentially problematic characters
+  return (
+    // No script tag or HTML-like content
+    !/<script|<\/script|<iframe|<img|<svg|onerror|javascript:/i.test(message) &&
+    // No shell metacharacters
+    !/[;&|`$(){}><]/.test(message) &&
+    // No command injection patterns
+    !/\|\s*[a-z]+|&&\s*[a-z]+|`[^`]*`|\$\([^)]*\)/.test(message) &&
+    // No environment variable references
+    !/\${[^}]*}|\$[A-Za-z0-9_]+/.test(message) &&
+    // No URLs that could be used to exfiltrate data
+    !/https?:\/\/[^\s]{20,}/.test(message) &&
+    // No long and suspicious repetitions
+    !/(.)\1{50,}/.test(message) &&
+    // Not excessively long
+    message.length <= 2000
+  );
+}
+
+/**
+ * Sanitizes a commit message to make it safe for Git operations
+ * Enhanced to handle more edge cases and ensure consistent output
+ * 
+ * @param message The commit message to sanitize
+ * @returns A sanitized version of the commit message
+ */
+export function sanitizeCommitMessage(message: string): string {
+  if (!message || typeof message !== 'string') {
+    return 'Commit message';
+  }
+  
+  // Replace potentially problematic characters
+  let sanitized = message
+    // Remove shell metacharacters
+    .replace(/[;&|`$(){}><]/g, '')
+    // Remove HTML and script tags
+    .replace(/<script|<\/script|<iframe|<img|<svg|onerror|javascript:/gi, '')
+    // Remove command injection patterns
+    .replace(/\|\s*[a-z]+|&&\s*[a-z]+|`[^`]*`|\$\([^)]*\)/g, '')
+    // Remove environment variable references
+    .replace(/\${[^}]*}|\$[A-Za-z0-9_]+/g, '')
+    // Remove URLs that could be used to exfiltrate data
+    .replace(/https?:\/\/[^\s]{20,}/g, '[URL removed]')
+    // Collapse repeated characters
+    .replace(/(.)\1{50,}/g, '$1$1$1');
+  
+  // Limit length to reasonable size
+  const MAX_COMMIT_LENGTH = 2000;
+  if (sanitized.length > MAX_COMMIT_LENGTH) {
+    sanitized = sanitized.substring(0, MAX_COMMIT_LENGTH) + '...';
+  }
+  
+  // Ensure there's some content
+  sanitized = sanitized.trim();
+  if (!sanitized) {
+    return 'Commit message';
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Validates a Git command to prevent dangerous operations
+ * 
+ * @param command The Git command to validate
+ * @returns True if the command is safe, false otherwise
+ */
+export function isValidGitCommand(command: string): boolean {
+  if (!command || typeof command !== 'string') {
+    return false;
+  }
+  
+  // List of allowed Git commands
+  const allowedCommands = [
+    'add', 'branch', 'checkout', 'commit', 'diff', 'fetch',
+    'log', 'merge', 'pull', 'push', 'rebase', 'remote',
+    'reset', 'restore', 'rev-parse', 'status', 'stash', 'symbolic-ref'
+  ];
+  
+  // Extract the base command (e.g., 'git add' -> 'add')
+  const baseCommand = command.split(/\s+/)[0].toLowerCase();
+  
+  // Check if the base command is allowed
+  if (!allowedCommands.includes(baseCommand)) {
+    return false;
+  }
+  
+  // Check for dangerous flags
+  const dangerousFlags = [
+    '--exec', '-x', '--upload-pack', '--receive-pack',
+    '--hooks', '--config', '--system', '--global',
+    '--user-scripts', '--git-dir', '--work-tree'
+  ];
+  
+  // Check if any dangerous flags are present
+  for (const flag of dangerousFlags) {
+    if (command.includes(flag)) {
+      return false;
+    }
+  }
+  
+  // Check for shell injection patterns
+  if (/[;&|`$(){}><]/.test(command)) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Sanitizes a Git command to make it safe
+ * 
+ * @param command The Git command to sanitize
+ * @param defaultCommand The default command to return if sanitization fails
+ * @returns A sanitized version of the Git command
+ */
+export function sanitizeGitCommand(command: string, defaultCommand: string = 'status'): string {
+  if (!command || typeof command !== 'string') {
+    return `${defaultCommand}`;
+  }
+  
+  // Extract the base command
+  const parts = command.split(/\s+/);
+  const baseCommand = parts[0].toLowerCase();
+  
+  // List of allowed Git commands
+  const allowedCommands = [
+    'add', 'branch', 'checkout', 'commit', 'diff', 'fetch',
+    'log', 'merge', 'pull', 'push', 'rebase', 'remote',
+    'reset', 'restore', 'rev-parse', 'status', 'stash', 'symbolic-ref'
+  ];
+  
+  // Use default if base command is not allowed
+  if (!allowedCommands.includes(baseCommand)) {
+    return `${defaultCommand}`;
+  }
+  
+  // Filter out dangerous flags
+  const dangerousFlags = [
+    '--exec', '-x', '--upload-pack', '--receive-pack',
+    '--hooks', '--config', '--system', '--global',
+    '--user-scripts', '--git-dir', '--work-tree'
+  ];
+  
+  const safeArgs = parts.slice(1).filter(arg => {
+    return !dangerousFlags.some(flag => arg === flag || arg.startsWith(`${flag}=`));
+  });
+  
+  // Remove shell injection characters
+  const sanitizedArgs = safeArgs.map(arg => arg.replace(/[;&|`$(){}><]/g, ''));
+  
+  // Reconstruct the command
+  return [baseCommand, ...sanitizedArgs].join(' ');
+}

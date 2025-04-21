@@ -15,10 +15,10 @@ jobs:
         node-version: [16.x, 18.x, 20.x]
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'yarn'
@@ -41,11 +41,11 @@ jobs:
     
     - name: Upload Extension Artifact
       if: success() && matrix.node-version == '20.x' && github.event_name == 'push'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: patch-pilot-extension
         path: "*.vsix"
-
+        
   # This job will only run when triggered by a release commit message
   publish:
     needs: build
@@ -53,10 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Use Node.js 20.x
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: 20.x
         cache: 'yarn'
@@ -65,7 +65,7 @@ jobs:
       run: yarn install --frozen-lockfile
     
     - name: Download Extension Artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: patch-pilot-extension
     

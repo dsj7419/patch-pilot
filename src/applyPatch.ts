@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as DiffLib from 'diff';
 import { normalizeDiff } from './utilities';
-import { autoStageFiles } from './git';
+import { autoStageFiles } from './gitSecure';
 import { trackEvent } from './telemetry';
 import {
   PatchStrategyFactory,
@@ -17,6 +17,7 @@ import {
   FileInfo,
   DiffParsedPatch,
 } from './types/patchTypes';
+import { useOptimizedStrategies } from './strategies/optimizedPatchStrategy';
 
 /* ────────────────────── Multi‑file entry point ─────────────────────────── */
 
@@ -30,6 +31,7 @@ export async function applyPatch(
   const autoStage = opts.autoStage ?? cfg.get('autoStage', false);
   const fuzz = (opts.fuzz ?? cfg.get('fuzzFactor', 2)) as 0 | 1 | 2 | 3;
   const preview = opts.preview ?? true;
+  const mtimeCheck = opts.mtimeCheck ?? cfg.get('mtimeCheck', true);
 
   const canonical = normalizeDiff(patchText);
   const patches = DiffLib.parsePatch(canonical) as DiffParsedPatch[];
@@ -52,6 +54,17 @@ export async function applyPatch(
           reason: 'File not found in workspace',
         });
         continue;
+      }
+
+      // Record file stats before reading to detect external changes
+      let fileStats: vscode.FileStat | undefined;
+      if (mtimeCheck) {
+        try {
+          fileStats = await vscode.workspace.fs.stat(fileUri);
+        } catch (err) {
+          // If stat fails, continue anyway but without mtime check
+          console.warn(`Could not get file stats for ${relPath}, skipping mtime check`);
+        }
       }
 
       const doc = await vscode.workspace.openTextDocument(fileUri);
@@ -85,6 +98,36 @@ export async function applyPatch(
             reason: 'User cancelled after preview',
           });
           continue;
+        }
+      }
+
+      // Check if file was modified externally while we were working
+      if (mtimeCheck && fileStats) {
+        try {
+          const currentStats = await vscode.workspace.fs.stat(fileUri);
+          
+          // Compare mtimes directly - in VS Code API these are numbers 
+          // (milliseconds since epoch)
+          if (fileStats.mtime !== currentStats.mtime) {
+            const confirmOverwrite = await vscode.window.showWarningMessage(
+              `File ${relPath} has been modified since reading it. Apply patch anyway?`,
+              { modal: true },
+              'Apply Anyway',
+              'Cancel'
+            );
+            
+            if (confirmOverwrite !== 'Apply Anyway') {
+              results.push({
+                file: relPath,
+                status: 'failed',
+                reason: 'File modified externally, update aborted'
+              });
+              continue;
+            }
+          }
+        } catch (err) {
+          // If stat fails at this point, continue but log warning
+          console.warn(`Could not verify file stats for ${relPath}`);
         }
       }
 
@@ -125,6 +168,7 @@ export async function applyPatch(
     files: results.length,
     success: results.filter((r) => r.status === 'applied').length,
     fuzz,
+    mtimeCheck
   });
 
   return results;
@@ -137,7 +181,35 @@ export async function applyPatchToContent(
   patch: DiffParsedPatch,
   fuzz: 0 | 1 | 2 | 3,
 ): Promise<PatchResult> {
-  return PatchStrategyFactory.createDefaultStrategy(fuzz).apply(content, patch);
+  // Check if the patch is large - could be performance intensive
+  const isLargePatch = patch.hunks.length > 5 || content.length > 100000;
+  const isLargeFile = content.length > 500000; // ~500KB
+  
+  if (isLargePatch || isLargeFile) {
+    // Use optimized strategies for large patches or files
+    // This enhances performance with potentially large diffs
+    trackEvent('patch_content', { 
+      strategy: 'optimized', 
+      hunkCount: patch.hunks.length,
+      contentSize: content.length
+    });
+    
+    // Create the standard strategy first
+    const standardStrategy = PatchStrategyFactory.createDefaultStrategy(fuzz);
+    // Then wrap it with optimized strategies that handle large files better
+    const optimizedStrategy = useOptimizedStrategies(standardStrategy, fuzz);
+    
+    return optimizedStrategy.apply(content, patch);
+  } else {
+    // Use standard strategies for normal patches
+    trackEvent('patch_content', { 
+      strategy: 'standard', 
+      hunkCount: patch.hunks.length,
+      contentSize: content.length
+    });
+    
+    return PatchStrategyFactory.createDefaultStrategy(fuzz).apply(content, patch);
+  }
 }
 
 /* ───────────────────────── Preview diff editor ─────────────────────────── */
@@ -171,7 +243,7 @@ async function showPatchPreview(
       'vscode.diff',
       left,
       right,
-      `Patch Preview – ${relPath}`,
+      `Patch Preview – ${relPath}`,
     );
     const choice = await vscode.window.showInformationMessage(
       `Apply patch to ${relPath}?`,
@@ -203,6 +275,12 @@ async function resolveWorkspaceFile(
   const roots = vscode.workspace.workspaceFolders;
   if (!roots?.length) {throw new Error('No workspace folder open.');}
 
+  // Security improvement: Validate the relative path
+  if (!relPath || relPath.includes('..') || relPath.startsWith('/')) {
+    throw new Error(`Invalid file path: ${relPath}`);
+  }
+
+  // Try each workspace folder
   for (const r of roots) {
     const uri = vscode.Uri.joinPath(r.uri, relPath);
     try {
@@ -213,17 +291,37 @@ async function resolveWorkspaceFile(
     }
   }
 
+  // If not found directly, try finding by filename
   const fname = relPath.split('/').pop() ?? relPath;
+  if (!fname || fname === '' || fname === '..' || fname === '.') {
+    return undefined;
+  }
+
   const found = await vscode.workspace.findFiles(
     `**/${fname}`,
     '**/node_modules/**',
+    10 // Limit results to avoid performance issues
   );
 
   if (found.length === 1) {return found[0];}
   if (found.length > 1) {
+    // Get stats for each found file
+    const filesWithStats = [];
+    for (const f of found) {
+      const stats = await vscode.workspace.fs.stat(f);
+      filesWithStats.push({
+        label: vscode.workspace.asRelativePath(f),
+        uri: f,
+        description: `Last modified: ${new Date(stats.mtime).toLocaleString()}`
+      });
+    }
+    
     const pick = await vscode.window.showQuickPick(
-      found.map((f) => ({ label: vscode.workspace.asRelativePath(f), uri: f })),
-      { placeHolder: `Select file for patch «${relPath}»` },
+      filesWithStats,
+      {
+        placeHolder: `Select file for patch «${relPath}»`,
+        title: "Multiple files match the patch target"
+      },
     );
     return pick?.uri;
   }
@@ -244,11 +342,26 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
 
   const info: FileInfo[] = [];
 
+  // Performance enhancement: pre-check all files first to avoid redundant workspace queries
+  const filePathMap = new Map<string, boolean>(); // Map of file path to existence status
+  
+  for (const p of patches) {
+    const path = extractFilePath(p);
+    if (!path) {continue;}
+    
+    // Skip duplicate paths
+    if (filePathMap.has(path)) {continue;}
+    
+    // Check if file exists
+    const uri = await resolveWorkspaceFile(path);
+    filePathMap.set(path, !!uri);
+  }
+
+  // Now process each patch with the pre-checked file existence status
   for (const p of patches) {
     const path = extractFilePath(p);
     if (!path) {continue;}
 
-    const uri = await resolveWorkspaceFile(path);
     let add = 0;
     let del = 0;
 
@@ -261,7 +374,7 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
 
     info.push({
       filePath: path,
-      exists: !!uri,
+      exists: filePathMap.get(path) ?? false,
       hunks: p.hunks.length,
       changes: { additions: add, deletions: del },
     });
