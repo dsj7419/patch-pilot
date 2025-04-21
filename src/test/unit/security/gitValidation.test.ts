@@ -121,6 +121,83 @@ describe('Git Security Validation', () => {
       expect(sanitizeBranchName('branch;rm -rf /')).toBe('branch-rm--rf--');
       expect(sanitizeBranchName('branch$(cat /etc/passwd)')).toBe('branch-cat--etc-passwd-');
     });
+
+    it('should reject branch names with $ character', () => {
+        expect(isValidBranchName('branch$name')).toBe(false);
+      });
+      
+      it('should reject branch names with % character', () => {
+        expect(isValidBranchName('branch%20name')).toBe(false);
+      });
+      
+      it('should reject branch names ending with /', () => {
+        expect(isValidBranchName('branch-name/')).toBe(false);
+      });
+      
+      it('should reject branch names with control characters', () => {
+        expect(isValidBranchName('branch\x01name')).toBe(false);
+      });
+      
+      it('should properly sanitize branch names with $ character', () => {
+        expect(sanitizeBranchName('branch$name')).toBe('branch-name');
+      });
+      
+      it('should reject branch names with $ character', () => {
+        expect(isValidBranchName('branch$name')).toBe(false);
+      });
+      
+      it('should reject branch names with % character', () => {
+        expect(isValidBranchName('branch%20name')).toBe(false);
+      });
+      
+      it('should reject branch names ending with /', () => {
+        expect(isValidBranchName('branch-name/')).toBe(false);
+      });
+      
+      it('should reject branch names with control characters', () => {
+        expect(isValidBranchName('branch\x01name')).toBe(false);
+      });
+      
+      it('should properly sanitize branch names with $ character', () => {
+        expect(sanitizeBranchName('branch$name')).toBe('branch-name');
+      });
+      
+      it('should properly sanitize branch names with % character', () => {
+        expect(sanitizeBranchName('branch%20name')).toBe('branch-20-name');
+      });
+      
+      it('should properly sanitize branch names ending with /', () => {
+        expect(sanitizeBranchName('branch-name/')).toBe('branch-name');
+      });
+      
+      // Tests for enhanced file path validation
+      it('should reject file paths with null bytes', () => {
+        expect(isValidFilePath('file\0.txt', '/workspace')).toBe(false);
+      });
+      
+      it('should reject overly long file paths', () => {
+        const longPath = 'a'.repeat(1001) + '.txt';
+        expect(isValidFilePath(longPath, '/workspace')).toBe(false);
+      });
+      
+      // Tests for enhanced commit message validation
+      it('should reject commit messages with URL encoding attacks', () => {
+        expect(isValidCommitMessage('Fix bug %3Brm%20-rf%20/')).toBe(false);
+      });
+      
+      it('should reject commit messages with shell metacharacters in brackets', () => {
+        expect(isValidCommitMessage('Update code [rm -rf /]')).toBe(false);
+      });
+      
+      it('should properly sanitize URL encoding attacks in commit messages', () => {
+        expect(sanitizeCommitMessage('Fix bug %3Brm%20-rf%20/')).toBe('Fix bug rm-rf/');
+      });
+      
+      // Tests for array input validation
+      it('should return an empty array when validateFilePaths is called with non-array input', () => {
+        // @ts-ignore - intentionally passing incorrect type
+        expect(validateFilePaths('not-an-array')).toEqual([]);
+      });
   });
 
   describe('isValidFilePath', () => {

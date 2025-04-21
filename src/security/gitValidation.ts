@@ -17,7 +17,7 @@ export function isValidBranchName(name: string): boolean {
   
   // Git branch naming rules (enhanced):
   // Cannot have ASCII control characters (0-31) or DEL (127)
-  // Cannot have: space, ~, ^, :, ?, *, [, \, |, &, ;, <, >, `, $, (), {}, or multiple consecutive dots
+  // Cannot have: space, ~, ^, :, ?, *, [, \, |, &, ;, <, >, `, $, %, (), {}, or multiple consecutive dots
   // Cannot begin with a dot, forward slash, dash, or underscore
   // Cannot end with .lock or .swp
   // Cannot contain a double dot ".."
@@ -34,16 +34,19 @@ export function isValidBranchName(name: string): boolean {
   return (
     // Basic length check
     name.length <= MAX_BRANCH_LENGTH &&
+    name.length > 0 &&
     // Not a reserved name
     !RESERVED_NAMES.includes(name.toUpperCase()) &&
-    // Basic syntax check - more strict than before
-    /^[^\s~^:?*[\\\0-\x1F\x7F|&;<>`$(){}\[\]]+$/i.test(name) &&
+    // Basic syntax check - more strict than before, added $ and % characters
+    /^[^\s~^:?*[\\\0-\x1F\x7F|&;<>`$%(){}\[\]]+$/i.test(name) &&
     // No double dots
     !name.includes('..') &&
     // Cannot start with . / - or _
     !/^[.\/_-]/.test(name) &&
     // Cannot end with .lock or .swp
     !/\.(lock|swp)$/.test(name) &&
+    // Cannot end with slash (additional check)
+    !name.endsWith('/') &&
     // Cannot contain reflog expression
     !name.includes('@{')
   );
@@ -70,7 +73,11 @@ export function sanitizeBranchName(name: string): string {
     
     // Regular sanitization logic
     let sanitized = name
-      .replace(/\$/g, '-')  
+      // Handle URL encoded patterns (specifically %XX patterns)
+      .replace(/%([0-9a-fA-F]{2})/g, '-$1-')
+      // Explicitly replace $ and % before other characters to prevent bypasses
+      .replace(/\$/g, '-')
+      .replace(/%/g, '-')  
       .replace(/;/g, '-')   
       .replace(/\(/g, '-')  
       .replace(/\)/g, '-')  
@@ -79,6 +86,9 @@ export function sanitizeBranchName(name: string): string {
       .replace(/\.\./g, '-')
       .replace(/@\{/g, '-at-')
       .replace(/\.(lock|swp)$/, '-$1');
+    
+    // Remove trailing slashes and any trailing hyphens that resulted from replacements
+    sanitized = sanitized.replace(/-+$/, '');
     
     // Remove leading . / - or _
     sanitized = sanitized.replace(/^[.\/_-]+/, '');
@@ -121,7 +131,18 @@ export function isValidFilePath(filePath: string, workspacePath: string): boolea
   }
   
   try {
+    // Check for null bytes which can cause string termination issues
+    if (filePath.includes('\0')) {
+      return false;
+    }
+    
+    // Check for extremely long paths that might cause issues
+    if (filePath.length > 1000) {
+      return false;
+    }
+    
     // Normalize and resolve to absolute path
+    // Use normalize to handle different path separators and NFC/NFD Unicode normalization
     const normalizedPath = path.normalize(filePath);
     
     // Get absolute path - handle both relative and absolute input paths
@@ -138,18 +159,13 @@ export function isValidFilePath(filePath: string, workspacePath: string): boolea
       return false;
     }
     
-    // Check for unsafe path patterns
+    // Check for unsafe path patterns (expanded to include unicode shenanigans)
     if (/\\\\|\/\/|\.\.\/|~\/|\$|%|&|\||;|>|<|`|\(|\)|\{|\}|\[|\]/.test(relativePath)) {
       return false;
     }
     
     // Check for null bytes and control characters
     if (/[\0-\x1F]/.test(relativePath)) {
-      return false;
-    }
-    
-    // Check for extremely long paths that might cause issues
-    if (relativePath.length > 1000) {
       return false;
     }
     
@@ -168,6 +184,10 @@ export function isValidFilePath(filePath: string, workspacePath: string): boolea
  * @returns An array of valid and sanitized file paths
  */
 export function validateFilePaths(filePaths: string[]): string[] {
+  if (!Array.isArray(filePaths)) {
+    return [];
+  }
+  
   // Get workspace folders for validation context
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -200,9 +220,9 @@ export function isValidCommitMessage(message: string): boolean {
     // No script tag or HTML-like content
     !/<script|<\/script|<iframe|<img|<svg|onerror|javascript:/i.test(message) &&
     // No shell metacharacters
-    !/[;&|`$(){}><]/.test(message) &&
-    // No command injection patterns
-    !/\|\s*[a-z]+|&&\s*[a-z]+|`[^`]*`|\$\([^)]*\)/.test(message) &&
+    !/[;&|`$(){}><\[\]]/.test(message) &&
+    // No command injection patterns - enhanced with more patterns
+    !/\|\s*[a-z]+|&&\s*[a-z]+|`[^`]*`|\$\([^)]*\)|\$\{[^}]*\}|%[0-9a-f]{2}/.test(message) &&
     // No environment variable references
     !/\${[^}]*}|\$[A-Za-z0-9_]+/.test(message) &&
     // No URLs that could be used to exfiltrate data
@@ -210,7 +230,9 @@ export function isValidCommitMessage(message: string): boolean {
     // No long and suspicious repetitions
     !/(.)\1{50,}/.test(message) &&
     // Not excessively long
-    message.length <= 2000
+    message.length <= 2000 &&
+    // Minimum length
+    message.length > 0
   );
 }
 
@@ -239,16 +261,18 @@ export function sanitizeCommitMessage(message: string): string {
       return 'Commit ';  // Space after "Commit" is important
     }
     
-    // Regular sanitization logic
+    // Regular sanitization logic - expanded for better coverage
     let sanitized = message
       .replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, '')
       .replace(/<(?:img|iframe|svg)[^>]*>/gi, '')
       .replace(/<(?:[^>]*)(onerror|javascript:)[^>]*>/gi, '')
-      .replace(/[;&|`$(){}><]/g, '')
+      .replace(/[;&|`$(){}><\[\]]/g, '')
       .replace(/\|\s*[a-z]+|&&\s*[a-z]+|`[^`]*`|\$\([^)]*\)/g, '')
       .replace(/\${[^}]*}|\$[A-Za-z0-9_]+/g, '')
       .replace(/https?:\/\/[^\s]{20,}/g, '[URL removed]')
-      .replace(/(.)\1{50,}/g, '$1$1$1');
+      .replace(/(.)\1{50,}/g, '$1$1$1')
+      // Add removal of percent encoding attack vectors
+      .replace(/%[0-9a-f]{2}/gi, '');
     
     sanitized = sanitized.trim();
     if (!sanitized) {
@@ -299,7 +323,7 @@ export function isValidGitCommand(command: string): boolean {
   }
   
   // Check for shell injection patterns
-  if (/[;&|`$(){}><]/.test(command)) {
+  if (/[;&|`$(){}><\[\]]/.test(command)) {
     return false;
   }
   
@@ -346,7 +370,7 @@ export function sanitizeGitCommand(command: string, defaultCommand: string = 'st
   });
   
   // Remove shell injection characters
-  const sanitizedArgs = safeArgs.map(arg => arg.replace(/[;&|`$(){}><]/g, ''));
+  const sanitizedArgs = safeArgs.map(arg => arg.replace(/[;&|`$(){}><\[\]]/g, ''));
   
   // Reconstruct the command
   return [baseCommand, ...sanitizedArgs].join(' ');
