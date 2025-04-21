@@ -62,36 +62,36 @@ describe('File System Module', () => {
     });
     
     it('should detect modification and prompt user when promptOnModification is true', async () => {
-      // Create file URI
-      const fileUri = vscode.Uri.file('/test/file.txt');
-      
-      // Create original stats
-      const originalStats = { mtime: 1000 };
-      
-      // Mock fs.stat to return a different mtime
-      (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({ mtime: 2000 });
-      
-      // Mock showWarningMessage to return 'Proceed Anyway'
-      expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
-        expect.stringContaining('File'),
-        expect.anything(),
-        'Proceed Anyway',
-        'Cancel'
-      );;
-      
-      // Check modification
-      const result = await checkFileModification(fileUri, originalStats as vscode.FileStat, {
-        mtimeCheck: true,
-        promptOnModification: true
+        // Create file URI
+        const fileUri = vscode.Uri.file('/test/file.txt');
+        
+        // Create original stats
+        const originalStats = { mtime: 1000 };
+        
+        // Mock fs.stat to return a different mtime
+        (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({ mtime: 2000 });
+        
+        // Setup the showWarningMessage mock properly
+        (vscode.window.showWarningMessage as jest.Mock).mockResolvedValue('Proceed Anyway');
+        
+        // Call the function first
+        const result = await checkFileModification(fileUri, originalStats as vscode.FileStat, {
+          mtimeCheck: true,
+          promptOnModification: true
+        });
+        
+        // Now check the mock was called with correct params
+        expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+          expect.stringContaining('File'),
+          { modal: true },
+          'Proceed Anyway',
+          'Cancel'
+        );
+        
+        // Should be modified and should proceed
+        expect(result.modified).toBe(true);
+        expect(result.proceed).toBe(true);
       });
-      
-      // Should be modified and should proceed
-      expect(result.modified).toBe(true);
-      expect(result.proceed).toBe(true);
-      
-      // Should have called showWarningMessage
-      expect(vscode.window.showWarningMessage).toHaveBeenCalled();
-    });
     
     it('should detect modification and not proceed when user cancels', async () => {
       // Create file URI

@@ -64,8 +64,10 @@ export async function checkFileModification(
     
     // If modified and we should prompt, ask the user
     if (options.promptOnModification) {
+      // FIXED: properly check if fileUri is defined before calling toString
+      const fileName = fileUri ? vscode.workspace.asRelativePath(fileUri) : 'file';
       const message = options.promptMessage || 
-        `File ${vscode.workspace.asRelativePath(fileUri)} has been modified since it was read. Proceed anyway?`;
+        `File ${fileName} has been modified since it was read. Proceed anyway?`;
       
       const choice = await vscode.window.showWarningMessage(
         message,
@@ -86,7 +88,9 @@ export async function checkFileModification(
     return { modified: true, proceed: false, originalStats, currentStats };
   } catch (error) {
     // If there's an error checking the file, log it and proceed
-    console.warn(`Error checking file modification for ${fileUri.toString()}: ${error}`);
+    // FIXED: Handle case where fileUri might be undefined
+    const filePathString = fileUri ? fileUri.toString() : 'unknown file';
+    console.warn(`Error checking file modification for ${filePathString}: ${error}`);
     return { modified: false, proceed: true, originalStats };
   }
 }

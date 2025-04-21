@@ -3,7 +3,7 @@
  * ----------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-import * as simpleGit from 'simple-git';
+import { simpleGit, SimpleGit } from 'simple-git';
 import * as cp from 'child_process';
 import { promisify } from 'util';
 import { trackEvent } from './telemetry';
@@ -47,7 +47,7 @@ export interface GitStatus {
   modified: string[];
   created: string[];
   deleted: string[];
-  renamed: simpleGit.StatusResultRenamed[] | string[];
+  renamed: unknown[] | string[];
   isDetachedHead: boolean;
   currentBranch?: string;
 }
@@ -72,7 +72,7 @@ export interface GitOptions {
  * @param options Configuration options
  * @returns SimpleGit instance or throws if not a Git repository
  */
-async function getGitInstance(options?: GitOptions): Promise<simpleGit.SimpleGit> {
+async function getGitInstance(options?: GitOptions): Promise<SimpleGit> {
   // Get workspace folders with validation
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -91,14 +91,14 @@ async function getGitInstance(options?: GitOptions): Promise<simpleGit.SimpleGit
     outputChannel.appendLine(`Initializing Git in ${workspacePath}`);
     
     // Configure simpleGit with appropriate options
-    const git = simpleGit.default(workspacePath, {
+    const git = simpleGit(workspacePath, {
         // Avoid binary file output issues with large diffs
         maxConcurrentProcesses: 1,
         // Use type assertion for non-standard options that are supported but not in types
         ...(({ 
           // Cap the output buffer to avoid OOM errors (10 MB)
           maxBufferLength: 10 * 1024 * 1024
-        } as unknown) as Partial<simpleGit.SimpleGitOptions>),
+        } as unknown) as object),
         // Provide a more secure binary option (with absolute path if available)
         binary: 'git'
       });
@@ -138,7 +138,7 @@ export async function detectGit(options?: GitOptions): Promise<GitDetectionResul
   
   try {
     // Try SimpleGit first
-    const git = simpleGit.default(workspacePath);
+    const git = simpleGit(workspacePath);
     const isRepo = await git.checkIsRepo();
     
     if (isRepo) {

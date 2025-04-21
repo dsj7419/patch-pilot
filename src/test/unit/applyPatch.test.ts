@@ -4,7 +4,7 @@ import { PatchStrategyFactory, PatchStrategy } from '../../strategies/patchStrat
 import * as vscode from 'vscode';
 import * as DiffLib from 'diff';
 import { createMockDocument, createMockParsedPatch } from '../setup/test-utils';
-import { autoStageFiles } from '../../git';
+import { autoStageFiles } from '../../gitSecure';  // FIXED: Import from gitSecure instead of git
 import {
   WELL_FORMED_DIFF,
   MULTI_FILE_DIFF,
@@ -21,7 +21,8 @@ jest.mock('diff');
 jest.mock('../../telemetry', () => ({
   trackEvent: jest.fn()
 }));
-jest.mock('../../git', () => ({
+// FIXED: Mock gitSecure instead of git
+jest.mock('../../gitSecure', () => ({
   autoStageFiles: jest.fn().mockResolvedValue(undefined)
 }));
 jest.mock('../../strategies/patchStrategy', () => {
@@ -65,6 +66,10 @@ jest.mock('../../strategies/patchStrategy', () => {
     GreedyStrategy: jest.fn().mockImplementation(() => mockGreedyStrategy),
     ChainedPatchStrategy: jest.fn().mockImplementation(() => mockChainedStrategy)
   };
+});
+
+describe('Apply Patch Module', () => {
+  // The rest of the file remains the same...
 });
 
 describe('Apply Patch Module', () => {
