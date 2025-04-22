@@ -52,52 +52,52 @@ import {
     });
   
     describe('OptimizedGreedyStrategy', () => {
-        it('should efficiently handle patches with non-matching context', () => {
-            // Use direct prototype spying instead of instance spying
-            const optimizeHunkSpy = jest.spyOn(OptimizedGreedyStrategy.prototype as any, 'optimizeHunk');
-            
-            const strategy = new OptimizedGreedyStrategy();
-            
-            // Mock to return successful patch on second attempt after optimization
-            (DiffLib.applyPatch as jest.Mock)
-              .mockReturnValueOnce(false) // First attempt fails (unmodified patch)
-              .mockReturnValueOnce('patched content'); // Second attempt succeeds (after optimization)
-            
-            // Create a patch with context lines that won't match
-            const patch = createMockParsedPatch({
-              hunks: [{
-                oldStart: 1,
-                oldLines: 4,
-                newStart: 1,
-                newLines: 4,
-                lines: [
-                  ' This context line does not exist in source',
-                  ' Another non-matching context line',
-                  '-line to remove',
-                  '+line to add',
-                  ' Yet another non-matching context'
-                ]
-              }]
-            });
-            
-            // File content without matching context
-            const source = 'Some content\nline to remove\nMore content';
-            
-            // Apply the strategy
-            const result = strategy.apply(source, patch);
-            
-            // Should succeed with optimized context lines
-            expect(result.success).toBe(true);
-            expect(result.patched).toBe('patched content');
-            expect(result.strategy).toBe('optimized-greedy');
-            
-            // Skip this check as it's not working reliably in the test environment
-            // expect(optimizeHunkSpy).toHaveBeenCalled();
-            
-            // Cleanup
-            optimizeHunkSpy.mockRestore();
-          });
-      
+      it('should efficiently handle patches with non-matching context', () => {
+        // Use direct prototype spying instead of instance spying
+        const optimizeHunkSpy = jest.spyOn(OptimizedGreedyStrategy.prototype as any, 'optimizeHunk');
+        
+        const strategy = new OptimizedGreedyStrategy();
+        
+        // Mock to return successful patch on second attempt after optimization
+        (DiffLib.applyPatch as jest.Mock)
+          .mockReturnValueOnce(false) // First attempt fails (unmodified patch)
+          .mockReturnValueOnce('patched content'); // Second attempt succeeds (after optimization)
+        
+        // Create a patch with context lines that won't match
+        const patch = createMockParsedPatch({
+          hunks: [{
+            oldStart: 1,
+            oldLines: 4,
+            newStart: 1,
+            newLines: 4,
+            lines: [
+              ' This context line does not exist in source',
+              ' Another non-matching context line',
+              '-line to remove',
+              '+line to add',
+              ' Yet another non-matching context'
+            ]
+          }]
+        });
+        
+        // File content without matching context
+        const source = 'Some content\nline to remove\nMore content';
+        
+        // Apply the strategy
+        const result = strategy.apply(source, patch);
+        
+        // Should succeed with optimized context lines
+        expect(result.success).toBe(true);
+        expect(result.patched).toBe('patched content');
+        expect(result.strategy).toBe('optimized-greedy');
+        
+        // Skip this check as it's not working reliably in the test environment
+        // expect(optimizeHunkSpy).toHaveBeenCalled();
+        
+        // Cleanup
+        optimizeHunkSpy.mockRestore();
+      });
+        
       it('should preserve all add/remove lines while filtering context', () => {
         // Setup to verify the filtered patch
         (DiffLib.applyPatch as jest.Mock).mockImplementation((content, patch) => {
@@ -424,42 +424,42 @@ import {
     });
   
     describe('useOptimizedStrategies', () => {
-        it('should wrap standard strategy for large patches', () => {
-            // Create a standard strategy
-            const standardStrategy = PatchStrategyFactory.createDefaultStrategy(2);
-            
-            // Wrap it with optimization
-            const optimizedWrapper = useOptimizedStrategies(standardStrategy, 2);
-            
-            // Create a definitively large patch (20 hunks instead of 10)
-            const patch = createMockParsedPatch({
-              hunks: Array(20).fill(0).map((_, i) => ({
-                oldStart: i * 10 + 1,
-                oldLines: 3,
-                newStart: i * 10 + 1,
-                newLines: 3,
-                lines: [
-                  ' Context line',
-                  '-Remove line',
-                  '+Add line'
-                ]
-              }))
-            });
-            
-            // Create a larger content that will definitely trigger the large content threshold
-            const largeContent = Array(1000).fill('Line of content').join('\n');
-            
-            // Mock applyPatch to always succeed
-            (DiffLib.applyPatch as jest.Mock).mockReturnValue('patched content');
-            
-            // Apply the wrapper with large content and patch
-            const result = optimizedWrapper.apply(largeContent, patch);
-            
-            // Should succeed
-            expect(result.success).toBe(true);
-            expect(result.patched).toBe('patched content');
-            expect(result.strategy).toBe('performance-optimized');
-          });
+      it('should wrap standard strategy for large patches', () => {
+        // Create a standard strategy
+        const standardStrategy = PatchStrategyFactory.createDefaultStrategy(2);
+        
+        // Wrap it with optimization
+        const optimizedWrapper = useOptimizedStrategies(standardStrategy, 2);
+        
+        // Create a definitively large patch (20 hunks instead of borderline 10)
+        const patch = createMockParsedPatch({
+          hunks: Array(20).fill(0).map((_, i) => ({
+            oldStart: i * 10 + 1,
+            oldLines: 3,
+            newStart: i * 10 + 1,
+            newLines: 3,
+            lines: [
+              ' Context line',
+              '-Remove line',
+              '+Add line'
+            ]
+          }))
+        });
+        
+        // Create a content that is large enough to be consistently classified as "large"
+        const largeContent = Array(1000).fill('Line of content').join('\n');
+        
+        // Mock applyPatch to always succeed
+        (DiffLib.applyPatch as jest.Mock).mockReturnValue('patched content');
+        
+        // Apply the wrapper with large content and patch
+        const result = optimizedWrapper.apply(largeContent, patch);
+        
+        // Should succeed with performance-optimized strategy
+        expect(result.success).toBe(true);
+        expect(result.patched).toBe('patched content');
+        expect(result.strategy).toBe('performance-optimized');
+      });
       
       it('should use standard strategy for small patches', () => {
         // Create a mock standard strategy
