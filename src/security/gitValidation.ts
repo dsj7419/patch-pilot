@@ -119,14 +119,14 @@ export function sanitizeBranchName(name: string): string {
 
 /**
  * Validates a file path to ensure it's safe to use with Git operations
- * Enhanced to check against directory traversal and work across platforms
+ * Enhanced to check against directory traversal across all platforms
  * 
  * @param filePath The file path to validate
  * @param workspacePath The base workspace path for validation
  * @returns True if the path is valid and within the workspace
  */
 export function isValidFilePath(filePath: string, workspacePath: string): boolean {
-    if (!filePath || typeof filePath !== 'string' || !workspacePath) {
+    if (!filePath || typeof filePath !== 'string' || !workspacePath || typeof workspacePath !== 'string') {
       return false;
     }
     
@@ -141,21 +141,37 @@ export function isValidFilePath(filePath: string, workspacePath: string): boolea
         return false;
       }
       
-      // Normalize paths to handle different path separators
-      const normalizedFilePath = path.normalize(filePath);
-      const normalizedWorkspacePath = path.normalize(workspacePath);
-      
-      // Check if the path is absolute or relative
-      if (path.isAbsolute(normalizedFilePath)) {
-        // For absolute paths, directly check if it's within the workspace
-        const relativePath = path.relative(normalizedWorkspacePath, normalizedFilePath);
-        return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
-      } else {
-        // For relative paths, make sure they don't escape the workspace
-        const absoluteFilePath = path.resolve(normalizedWorkspacePath, normalizedFilePath);
-        const relativePath = path.relative(normalizedWorkspacePath, absoluteFilePath);
-        return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+      // Special case handling for absolute paths
+      if (path.isAbsolute(filePath)) {
+        // For absolute paths, we must explicitly reject them
+        // Absolute paths are generally a security risk in this context
+        return false;
       }
+      
+      // Detect paths trying to escape the workspace with relative navigation
+      const normalizedPath = path.normalize(filePath);
+      
+      // Check for path traversal attempts
+      if (normalizedPath.includes('..')) {
+        return false;
+      }
+      
+      // Catch Windows path traversal or absolute paths
+      if (normalizedPath.includes(':') || normalizedPath.startsWith('\\\\')) {
+        return false;
+      }
+      
+      // Additional safety checks for malicious patterns
+      if (/\\\\|\/\/|\.\.\/|~\/|\$|%|&|\||;|>|<|`|\(|\)|\{|\}|\[|\]/.test(normalizedPath)) {
+        return false;
+      }
+      
+      // Check for control characters
+      if (/[\0-\x1F]/.test(normalizedPath)) {
+        return false;
+      }
+      
+      return true;
     } catch (_err) {
       // Any path manipulation errors indicate an invalid path
       return false;
