@@ -52,3 +52,6 @@ vsc-extension-quickstart.md
 comparison-benchmark-results.json
 optimized-benchmark-results.json
 performance-results.json
+enhanced-benchmark-results.json
+large-diff-benchmark-results.json
+benchmark-report.json
