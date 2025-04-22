@@ -119,62 +119,48 @@ export function sanitizeBranchName(name: string): string {
 
 /**
  * Validates a file path to ensure it's safe to use with Git operations
- * Enhanced to check against directory traversal, symlink attacks, and unsafe paths
+ * Enhanced to check against directory traversal and work across platforms
  * 
  * @param filePath The file path to validate
  * @param workspacePath The base workspace path for validation
  * @returns True if the path is valid and within the workspace
  */
 export function isValidFilePath(filePath: string, workspacePath: string): boolean {
-  if (!filePath || typeof filePath !== 'string' || !workspacePath) {
-    return false;
+    if (!filePath || typeof filePath !== 'string' || !workspacePath) {
+      return false;
+    }
+    
+    try {
+      // Check for null bytes which can cause string termination issues
+      if (filePath.includes('\0')) {
+        return false;
+      }
+      
+      // Check for extremely long paths that might cause issues
+      if (filePath.length > 1000) {
+        return false;
+      }
+      
+      // Normalize paths to handle different path separators
+      const normalizedFilePath = path.normalize(filePath);
+      const normalizedWorkspacePath = path.normalize(workspacePath);
+      
+      // Check if the path is absolute or relative
+      if (path.isAbsolute(normalizedFilePath)) {
+        // For absolute paths, directly check if it's within the workspace
+        const relativePath = path.relative(normalizedWorkspacePath, normalizedFilePath);
+        return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+      } else {
+        // For relative paths, make sure they don't escape the workspace
+        const absoluteFilePath = path.resolve(normalizedWorkspacePath, normalizedFilePath);
+        const relativePath = path.relative(normalizedWorkspacePath, absoluteFilePath);
+        return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+      }
+    } catch (_err) {
+      // Any path manipulation errors indicate an invalid path
+      return false;
+    }
   }
-  
-  try {
-    // Check for null bytes which can cause string termination issues
-    if (filePath.includes('\0')) {
-      return false;
-    }
-    
-    // Check for extremely long paths that might cause issues
-    if (filePath.length > 1000) {
-      return false;
-    }
-    
-    // Normalize and resolve to absolute path
-    // Use normalize to handle different path separators and NFC/NFD Unicode normalization
-    const normalizedPath = path.normalize(filePath);
-    
-    // Get absolute path - handle both relative and absolute input paths
-    const absolutePath = path.isAbsolute(normalizedPath) 
-      ? normalizedPath 
-      : path.resolve(workspacePath, normalizedPath);
-    
-    // Get normalized workspace path
-    const normalizedWorkspacePath = path.normalize(workspacePath);
-    
-    // Ensure path is within workspace (prevent directory traversal)
-    const relativePath = path.relative(normalizedWorkspacePath, absolutePath);
-    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      return false;
-    }
-    
-    // Check for unsafe path patterns (expanded to include unicode shenanigans)
-    if (/\\\\|\/\/|\.\.\/|~\/|\$|%|&|\||;|>|<|`|\(|\)|\{|\}|\[|\]/.test(relativePath)) {
-      return false;
-    }
-    
-    // Check for null bytes and control characters
-    if (/[\0-\x1F]/.test(relativePath)) {
-      return false;
-    }
-    
-    return true;
-  } catch (_err) {
-    // Any path manipulation errors indicate an invalid path
-    return false;
-  }
-}
 
 /**
  * Validates and sanitizes an array of file paths for Git operations
