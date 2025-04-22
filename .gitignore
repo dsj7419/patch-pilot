@@ -39,9 +39,6 @@ Thumbs.db
 # Coverage directory
 coverage/
 
-# yarn
-yarn.lock
-
 # Quickstart
 vsc-extension-quickstart.md
 
