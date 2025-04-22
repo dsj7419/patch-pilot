@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "patchpilot",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.99.0"
   },
   "categories": [
     "Other",
@@ -24,7 +24,7 @@
   "icon": "media/logo.png",
   "main": "./out/extension.js",
   "activationEvents": [
-  "onLanguage:diff"
+    "onLanguage:diff"
   ],
   "contributes": {
     "commands": [
@@ -96,56 +96,49 @@
     ]
   },
   "scripts": {
-  "vscode:prepublish": "yarn compile",
-  "compile": "tsc -p ./ && node build-webview.js",
-  "watch": "tsc -watch -p ./",
-  "build:webview": "node build-webview.js",
-  "watch:webview": "node build-webview.js --watch",
-  "package": "vsce package",
-  "publish": "vsce publish",
-  "postinstall": "node -e \"try{require('vscode/bin/install')}catch(e){}\"",
-  "lint": "eslint \"src/**/*.{ts,tsx}\"",
-  
-  "test": "jest",
-  "test:watch": "jest --watch",
-  "test:coverage": "jest --coverage",
-  "test:unit": "jest src/test/unit",
-  "test:utilities": "jest src/test/unit/utilities",
-  "test:strategies": "jest src/test/unit/strategies",
-  "test:integration": "jest src/test/integration",
-  "test:e2e": "jest src/test/e2e",
-  
-  "benchmark": "npx ts-node src/test/benchmark/benchmarkRunner.ts",
-  "benchmark:clean": "npx ts-node src/test/benchmark/clean-benchmark-files.ts",
-  "benchmark:quick": "npx ts-node src/test/benchmark/benchmarkRunner.ts 10,100 2 false",
-  "benchmark:standard": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000 3 false",
-  "benchmark:thorough": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000,2000 5 false",
-  "benchmark:memory": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000 3 true",
-  "benchmark:large": "npx ts-node src/test/benchmark/benchmarkRunner.ts 1000,2000,5000 2 false",
-  "benchmark:extreme": "npx ts-node src/test/benchmark/benchmarkRunner.ts 5000,10000 1 true",
-  
-  "benchmark:fuzz:none": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 0",
-  "benchmark:fuzz:low": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 1",
-  "benchmark:fuzz:medium": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 2",
-  "benchmark:fuzz:high": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 3",
-  
-  "largediff": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts",
-  "largediff:small": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 100",
-  "largediff:medium": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 500",
-  "largediff:large": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000,2000",
-  "largediff:extreme": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts large",
-  
-  "profile:standard": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3",
-  "profile:memory": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3 true",
-  "profile:fuzz": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3 true 2",
-  
-  "benchmark:compare:standard": "npx ts-node src/test/benchmark/benchmarkRunner.ts compare",
-  "benchmark:compare:optimized": "npx ts-node src/test/benchmark/benchmarkRunner.ts optimized",
-  "benchmark:compare:all": "yarn benchmark:compare:standard && yarn benchmark:compare:optimized",
-  
-  "benchmark:report": "npx ts-node src/test/benchmark/generate-benchmark-report.ts",
-  "benchmark:suite": "yarn benchmark:clean && yarn benchmark:standard && yarn benchmark:memory && yarn benchmark:fuzz:medium && yarn largediff:medium && yarn benchmark:report"
-},
+    "vscode:prepublish": "yarn compile",
+    "compile": "tsc -p ./ && tsc -p ./tsconfig.webview.json && node build-webview.js",
+    "watch": "tsc -watch -p ./ & tsc -watch -p ./tsconfig.webview.json",
+    "build:webview": "node build-webview.js",
+    "watch:webview": "node build-webview.js --watch",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "postinstall": "node -e \"try{require('vscode/bin/install')}catch(e){}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest src/test/unit",
+    "test:utilities": "jest src/test/unit/utilities",
+    "test:strategies": "jest src/test/unit/strategies",
+    "test:integration": "jest src/test/integration",
+    "test:e2e": "jest src/test/e2e",
+    "benchmark": "npx ts-node src/test/benchmark/benchmarkRunner.ts",
+    "benchmark:clean": "npx ts-node src/test/benchmark/clean-benchmark-files.ts",
+    "benchmark:quick": "npx ts-node src/test/benchmark/benchmarkRunner.ts 10,100 2 false",
+    "benchmark:standard": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000 3 false",
+    "benchmark:thorough": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000,2000 5 false",
+    "benchmark:memory": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,500,1000 3 true",
+    "benchmark:large": "npx ts-node src/test/benchmark/benchmarkRunner.ts 1000,2000,5000 2 false",
+    "benchmark:extreme": "npx ts-node src/test/benchmark/benchmarkRunner.ts 5000,10000 1 true",
+    "benchmark:fuzz:none": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 0",
+    "benchmark:fuzz:low": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 1",
+    "benchmark:fuzz:medium": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 2",
+    "benchmark:fuzz:high": "npx ts-node src/test/benchmark/benchmarkRunner.ts 100,1000 3 false 3",
+    "largediff": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts",
+    "largediff:small": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 100",
+    "largediff:medium": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 500",
+    "largediff:large": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000,2000",
+    "largediff:extreme": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts large",
+    "profile:standard": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3",
+    "profile:memory": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3 true",
+    "profile:fuzz": "npx ts-node src/test/benchmark/largeDiffBenchmark.ts 1000 3 true 2",
+    "benchmark:compare:standard": "npx ts-node src/test/benchmark/benchmarkRunner.ts compare",
+    "benchmark:compare:optimized": "npx ts-node src/test/benchmark/benchmarkRunner.ts optimized",
+    "benchmark:compare:all": "yarn benchmark:compare:standard && yarn benchmark:compare:optimized",
+    "benchmark:report": "npx ts-node src/test/benchmark/generate-benchmark-report.ts",
+    "benchmark:suite": "yarn benchmark:clean && yarn benchmark:standard && yarn benchmark:memory && yarn benchmark:fuzz:medium && yarn largediff:medium && yarn benchmark:report"
+  },
   "devDependencies": {
     "@types/chai": "^5.2.1",
     "@types/diff": "^5.0.3",

@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+      "module": "commonjs",
+      "target": "ES2020",
+      "outDir": "out/webview",
+      "rootDir": "webview",
+      "lib": ["ES2020", "ES2022.Intl", "DOM"],
+      "sourceMap": true,
+      "strict": true,
+      "noImplicitReturns": true,
+      "noFallthroughCasesInSwitch": true,
+      "esModuleInterop": true,
+      "resolveJsonModule": true,
+      "skipLibCheck": true
+    },
+    "include": ["webview/**/*.ts"],
+    "exclude": ["node_modules", ".vscode-test"]
+  }
