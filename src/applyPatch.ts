@@ -61,7 +61,7 @@ export async function applyPatch(
       if (mtimeCheck) {
         try {
           fileStats = await vscode.workspace.fs.stat(fileUri);
-        } catch (err) {
+        } catch (_err) {
           // If stat fails, continue anyway but without mtime check
           console.warn(`Could not get file stats for ${relPath}, skipping mtime check`);
         }
@@ -125,7 +125,7 @@ export async function applyPatch(
               continue;
             }
           }
-        } catch (err) {
+        } catch (_err) {
           // If stat fails at this point, continue but log warning
           console.warn(`Could not verify file stats for ${relPath}`);
         }
@@ -157,9 +157,9 @@ export async function applyPatch(
   if (autoStage && staged.length) {
     try {
       await autoStageFiles(staged);
-    } catch (e) {
+    } catch (_e) {
       vscode.window.showWarningMessage(
-        `Patch applied but Git staging failed: ${(e as Error).message}`,
+        `Patch applied but Git staging failed: ${(_e as Error).message}`,
       );
     }
   }

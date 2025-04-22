@@ -29,15 +29,17 @@ export default [
       parser: tsParser,
       ecmaVersion: 2022,
       sourceType: 'module',
-      parserOptions: { 
+      parserOptions: {
         project: './tsconfig.json'
       }
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',
-        varsIgnorePattern: '^_'
+        argsIgnorePattern: '^_',          // Ignore unused function args starting with _
+        varsIgnorePattern: '^_',          // Ignore unused variables starting with _
+        caughtErrors: 'all',              // Check unused catch parameters
+        caughtErrorsIgnorePattern: '^_',  // Ignore unused catch parameters starting with _
       }],
       'curly': 'warn',
       'eqeqeq': 'warn',

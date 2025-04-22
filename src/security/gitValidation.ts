@@ -170,7 +170,7 @@ export function isValidFilePath(filePath: string, workspacePath: string): boolea
     }
     
     return true;
-  } catch (err) {
+  } catch (_err) {
     // Any path manipulation errors indicate an invalid path
     return false;
   }

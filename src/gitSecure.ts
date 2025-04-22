@@ -172,11 +172,11 @@ export async function detectGit(options?: GitOptions): Promise<GitDetectionResul
             gitPath: 'git',
             gitVersion
           };
-        } catch (e) {
+        } catch (_error) {
           // Not a git repo
           return { isGitRepo: false, workspacePath, gitPath: 'git', gitVersion };
         }
-      } catch (e) {
+      } catch (_e) {
         // Git CLI not available
         return { isGitRepo: false, workspacePath };
       }
@@ -196,11 +196,11 @@ export async function isGitAvailable(options?: GitOptions): Promise<boolean> {
   try {
     const result = await detectGit(options);
     return result.isGitRepo;
-  } catch (error) {
+  } catch (_error) {
     // Create output channel for logging errors
     const outputChannel = options?.outputChannel || 
                           vscode.window.createOutputChannel('PatchPilot Git');
-    outputChannel.appendLine(`Error checking Git availability: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    outputChannel.appendLine(`Error checking Git availability: ${_error instanceof Error ? _error.message : 'Unknown error'}`);
     return false;
   }
 }
@@ -520,7 +520,7 @@ export async function hasUncommittedChanges(options?: GitOptions): Promise<boole
   try {
     const status = await getGitStatus(options);
     return !status.isClean;
-  } catch (error) {
+  } catch (_error) {
     // Return false on error
     return false;
   }
@@ -535,7 +535,7 @@ export async function getCurrentBranch(options?: GitOptions): Promise<string | u
   try {
     const status = await getGitStatus(options);
     return status.currentBranch;
-  } catch (error) {
+  } catch (_error) {
     // Return undefined on error
     return undefined;
   }
