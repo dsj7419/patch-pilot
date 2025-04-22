@@ -9,73 +9,72 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
-        node-version: [16.x, 18.x, 20.x]
-    
+        # REMOVE 16.x and use only currently supported LTS versions
+        node-version: [18.x, 20.x] # Or just [20.x] if that's sufficient
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'yarn'
-    
+
     - name: Install dependencies
       run: yarn install --frozen-lockfile
-    
+
     - name: Lint
-      run: yarn lint
-    
+      run: yarn lint # This should now pass on Node 18+
+
     - name: Build
       run: yarn compile
-    
+
     - name: Test
       run: yarn test
-    
+
+    # Keep Node 20.x check for packaging/publishing consistency
     - name: Package Extension
-      if: success() && matrix.node-version == '20.x' && github.event_name == 'push'
+      if: success() && matrix.node-version == '20.x' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: yarn package
-    
+
     - name: Upload Extension Artifact
-      if: success() && matrix.node-version == '20.x' && github.event_name == 'push'
+      if: success() && matrix.node-version == '20.x' && github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
         name: patch-pilot-extension
         path: "*.vsix"
-        
-  # This job will only run when triggered by a release commit message
+
   publish:
     needs: build
     if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release v')
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Use Node.js 20.x
+
+    - name: Use Node.js 20.x # Publishing should use a specific LTS
       uses: actions/setup-node@v4
       with:
         node-version: 20.x
         cache: 'yarn'
-    
+
     - name: Install dependencies
       run: yarn install --frozen-lockfile
-    
+
     - name: Download Extension Artifact
       uses: actions/download-artifact@v4
       with:
         name: patch-pilot-extension
-    
-    # We need a marketplace token for this step
+
     - name: Publish to VS Code Marketplace
       env:
         VSCODE_MARKETPLACE_PAT: ${{ secrets.VSCODE_MARKETPLACE_PAT }}
-      run: yarn vsce publish -p "$VSCODE_MARKETPLACE_PAT"
-      
-    # We need an OpenVSX token for this step  
+      run: yarn vsce publish -p "$VSCODE_MARKETPLACE_PAT" *.vsix # Specify the vsix file
+
     - name: Publish to Open VSX Registry
       env:
         OPEN_VSX_PAT: ${{ secrets.OPEN_VSX_PAT }}
