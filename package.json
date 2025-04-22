@@ -23,6 +23,9 @@
   "preview": true,
   "icon": "media/logo.png",
   "main": "./out/extension.js",
+  "activationEvents": [
+  "onLanguage:diff"
+  ],
   "contributes": {
     "commands": [
       {
