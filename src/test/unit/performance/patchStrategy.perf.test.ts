@@ -424,42 +424,42 @@ import {
     });
   
     describe('useOptimizedStrategies', () => {
-      it('should wrap standard strategy for large patches', () => {
-        // Create a standard strategy
-        const standardStrategy = PatchStrategyFactory.createDefaultStrategy(2);
-        
-        // Wrap it with optimization
-        const optimizedWrapper = useOptimizedStrategies(standardStrategy, 2);
-        
-        // Create a large patch
-        const patch = createMockParsedPatch({
-          hunks: Array(10).fill(0).map((_, i) => ({
-            oldStart: i * 10 + 1,
-            oldLines: 3,
-            newStart: i * 10 + 1,
-            newLines: 3,
-            lines: [
-              ' Context line',
-              '-Remove line',
-              '+Add line'
-            ]
-          }))
-        });
-        
-        // Create a large content
-        const largeContent = Array(500).fill('Line of content').join('\n');
-        
-        // Mock applyPatch to always succeed
-        (DiffLib.applyPatch as jest.Mock).mockReturnValue('patched content');
-        
-        // Apply the wrapper with large content and patch
-        const result = optimizedWrapper.apply(largeContent, patch);
-        
-        // Should succeed
-        expect(result.success).toBe(true);
-        expect(result.patched).toBe('patched content');
-        expect(result.strategy).toBe('performance-optimized');
-      });
+        it('should wrap standard strategy for large patches', () => {
+            // Create a standard strategy
+            const standardStrategy = PatchStrategyFactory.createDefaultStrategy(2);
+            
+            // Wrap it with optimization
+            const optimizedWrapper = useOptimizedStrategies(standardStrategy, 2);
+            
+            // Create a definitively large patch (20 hunks instead of 10)
+            const patch = createMockParsedPatch({
+              hunks: Array(20).fill(0).map((_, i) => ({
+                oldStart: i * 10 + 1,
+                oldLines: 3,
+                newStart: i * 10 + 1,
+                newLines: 3,
+                lines: [
+                  ' Context line',
+                  '-Remove line',
+                  '+Add line'
+                ]
+              }))
+            });
+            
+            // Create a larger content that will definitely trigger the large content threshold
+            const largeContent = Array(1000).fill('Line of content').join('\n');
+            
+            // Mock applyPatch to always succeed
+            (DiffLib.applyPatch as jest.Mock).mockReturnValue('patched content');
+            
+            // Apply the wrapper with large content and patch
+            const result = optimizedWrapper.apply(largeContent, patch);
+            
+            // Should succeed
+            expect(result.success).toBe(true);
+            expect(result.patched).toBe('patched content');
+            expect(result.strategy).toBe('performance-optimized');
+          });
       
       it('should use standard strategy for small patches', () => {
         // Create a mock standard strategy
