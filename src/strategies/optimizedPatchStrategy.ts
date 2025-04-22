@@ -361,38 +361,38 @@ export class OptimizedPatchStrategyFactory {
  * @returns A patching function that uses optimized strategies
  */
 export function useOptimizedStrategies(
-  standardStrategy: PatchStrategy,
-  fuzzFactor: 0 | 1 | 2 | 3 = 2
-): PatchStrategy {
-  return {
-    name: 'performance-optimized',
-    apply: (content: string, patch: DiffParsedPatch): PatchResult => {
-      // Use adaptive thresholds based on content and patch characteristics
-      const contentSize = content.length;
-      const hunkCount = patch.hunks?.length || 0;
-      const totalHunkLines = patch.hunks?.reduce((sum, h) => sum + h.lines.length, 0) || 0;
-      
-      // Calculate complexity score to determine if optimization is needed
-      const complexityScore = 
-        (contentSize > 100000 ? 2 : contentSize > 10000 ? 1 : 0) + // Size factor
-        (hunkCount > 10 ? 2 : hunkCount > 5 ? 1 : 0) +            // Hunk count factor
-        (totalHunkLines > 1000 ? 2 : totalHunkLines > 500 ? 1 : 0); // Hunk size factor
-      
-      if (complexityScore >= 2) {
-        // Use optimized strategy for complex patches
-        const result = OptimizedPatchStrategyFactory.createOptimizedStrategy(fuzzFactor)
-          .apply(content, patch);
+    standardStrategy: PatchStrategy,
+    fuzzFactor: 0 | 1 | 2 | 3 = 2
+  ): PatchStrategy {
+    return {
+      name: 'performance-optimized',
+      apply: (content: string, patch: DiffParsedPatch): PatchResult => {
+        // Use adaptive thresholds based on content and patch characteristics
+        const contentSize = content.length;
+        const hunkCount = patch.hunks?.length || 0;
+        const totalHunkLines = patch.hunks?.reduce((sum, h) => sum + h.lines.length, 0) || 0;
         
-        // Ensure the strategy name is properly passed through
-        if (result.success) {
-          result.strategy = 'performance-optimized';
+        // Calculate complexity score to determine if optimization is needed
+        const complexityScore = 
+          (contentSize > 100000 ? 2 : contentSize > 10000 ? 1 : 0) + // Size factor
+          (hunkCount >= 10 ? 2 : hunkCount > 5 ? 1 : 0) +            // Hunk count factor
+          (totalHunkLines > 1000 ? 2 : totalHunkLines > 500 ? 1 : 0); // Hunk size factor
+        
+        if (complexityScore >= 2) {
+          // Use optimized strategy for complex patches
+          const result = OptimizedPatchStrategyFactory.createOptimizedStrategy(fuzzFactor)
+            .apply(content, patch);
+            
+          // Only set strategy name to 'performance-optimized' for successful optimized strategy results
+          if (result.success) {
+            result.strategy = 'performance-optimized';
+          }
+          
+          return result;
+        } else {
+          // Use standard strategy for simple patches and preserve its original strategy name
+          return standardStrategy.apply(content, patch);
         }
-        
-        return result;
-      } else {
-        // Use standard strategy for simple patches
-        return standardStrategy.apply(content, patch);
       }
-    }
-  };
-}
+    };
+  }
