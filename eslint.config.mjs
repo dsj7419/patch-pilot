@@ -12,12 +12,14 @@ export default [
       '**/*.d.ts',
       '.vscode-test/**',
       'coverage/**',
-      // Explicitly ignore JS config files that were causing problems
-      '*.js',       // Root JS files
-      '*.mjs',      // Root MJS files
+      '*.js', 
+      '*.mjs',
       'build-webview.js',
       'esbuild.js',
-      'jest.config.js'
+      'jest.config.js',
+      '**/*.md', 
+       '**/LICENSE',
+       '**/*.html'
     ]
   },
 
@@ -88,7 +90,7 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'module',
       parserOptions: {
-        project: './tsconfig.webview.json'  // Add this line
+        project: './tsconfig.webview.json'
       }
     },
     rules: {
