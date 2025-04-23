@@ -196,6 +196,7 @@ function handlePreviewClick(
   // Show loading state
   setStatus(statusMessage, 'Parsing patch...', 'normal');
   previewBtn.disabled = true;
+  previewBtn.setAttribute('aria-disabled', 'true');
   
   // Request preview from extension
   vscode.postMessage({
@@ -215,7 +216,9 @@ function handleApplyClick(
   // Show loading state
   setStatus(statusMessage, 'Applying patch...', 'normal');
   applyBtn.disabled = true;
+  applyBtn.setAttribute('aria-disabled', 'true');
   cancelBtn.disabled = true;
+  cancelBtn.setAttribute('aria-disabled', 'true');
   
   // Send patch to extension
   vscode.postMessage({
@@ -241,6 +244,10 @@ function handleCancelClick(
   vscode.postMessage({
     command: 'cancelPatch'
   });
+  
+  // Return focus to the textarea after cancellation
+  const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
+  patchInput.focus();
 }
 
 /**
@@ -259,6 +266,7 @@ function handlePatchPreview(
   if (!fileInfo || fileInfo.length === 0) {
     setStatus(statusMessage, 'No valid patches found in the provided text.', 'error');
     previewBtn.disabled = false;
+    previewBtn.setAttribute('aria-disabled', 'false');
     return;
   }
   
@@ -271,9 +279,11 @@ function handlePatchPreview(
   let missingFiles = 0;
   
   // Add file entries
-  fileInfo.forEach(file => {
+  fileInfo.forEach((file) => {
     const fileEntry = document.createElement('div');
     fileEntry.className = 'file-entry';
+    fileEntry.setAttribute('role', 'listitem');
+    fileEntry.setAttribute('tabindex', '0');
     
     // Track missing files
     if (!file.exists) {
@@ -287,6 +297,7 @@ function handlePatchPreview(
     // Create file icon (checkmark or warning)
     const fileIcon = document.createElement('span');
     fileIcon.className = `file-icon ${file.exists ? 'success-icon' : 'warning-icon'}`;
+    fileIcon.setAttribute('aria-hidden', 'true'); // Hide icon from screen readers
     fileIcon.textContent = file.exists ? '✓' : '⚠️';
     
     // Create file path
@@ -312,10 +323,11 @@ function handlePatchPreview(
     fileStats.appendChild(deletionSpan);
     fileStats.appendChild(document.createTextNode(')'));
     
-    // Add tooltip
-    if (!file.exists) {
-      fileEntry.title = 'File not found in workspace';
-    }
+    // Add tooltip and accessibility label
+    const statusText = file.exists ? 'file exists' : 'file not found in workspace';
+    fileEntry.title = `${file.filePath} - ${statusText}`;
+    fileEntry.setAttribute('aria-label', 
+      `${file.filePath}, ${statusText}, ${file.hunks} hunks, ${file.changes.additions} additions, ${file.changes.deletions} deletions`);
     
     // Append elements
     fileEntry.appendChild(fileIcon);
@@ -327,9 +339,11 @@ function handlePatchPreview(
   // Add summary row
   const summaryEntry = document.createElement('div');
   summaryEntry.className = 'file-entry summary-entry';
+  summaryEntry.setAttribute('role', 'listitem');
   
   const summaryIcon = document.createElement('span');
   summaryIcon.className = 'file-icon';
+  summaryIcon.setAttribute('aria-hidden', 'true');
   summaryIcon.textContent = '📊';
   
   const summaryText = document.createElement('span');
@@ -352,6 +366,10 @@ function handlePatchPreview(
   summaryStats.appendChild(totalDelSpan);
   summaryStats.appendChild(document.createTextNode(')'));
   
+  // Add accessibility label for summary
+  summaryEntry.setAttribute('aria-label', 
+    `Summary: ${fileInfo.length} files${missingFiles > 0 ? `, ${missingFiles} missing` : ''}, ${totalAdditions} additions, ${totalDeletions} deletions`);
+  
   summaryEntry.appendChild(summaryIcon);
   summaryEntry.appendChild(summaryText);
   summaryEntry.appendChild(summaryStats);
@@ -360,8 +378,11 @@ function handlePatchPreview(
   // Update UI
   previewArea.style.display = 'block';
   previewBtn.disabled = false;
+  previewBtn.setAttribute('aria-disabled', 'false');
   applyBtn.disabled = false;
+  applyBtn.setAttribute('aria-disabled', 'false');
   cancelBtn.disabled = false;
+  cancelBtn.setAttribute('aria-disabled', 'false');
   
   // Set status
   if (missingFiles > 0) {
@@ -369,6 +390,9 @@ function handlePatchPreview(
   } else {
     setStatus(statusMessage, `Ready to apply patch to ${fileInfo.length} files.`, 'success');
   }
+  
+  // Set focus to the apply button after preview loads
+  applyBtn.focus();
 }
 
 /**
@@ -421,14 +445,24 @@ function handlePatchResults(
   // Reset UI
   previewArea.style.display = 'none';
   applyBtn.disabled = true;
+  applyBtn.setAttribute('aria-disabled', 'true');
   cancelBtn.disabled = true;
+  cancelBtn.setAttribute('aria-disabled', 'true');
   previewBtn.disabled = false;
+  previewBtn.setAttribute('aria-disabled', 'false');
   
   // Clear input if successful
   if (failCount === 0) {
     patchInput.value = '';
     currentPatchText = '';
     vscode.setState({ patchText: '' });
+  }
+  
+  // Return focus to the textarea or preview button based on results
+  if (failCount === 0) {
+    patchInput.focus();
+  } else {
+    previewBtn.focus();
   }
 }
 
@@ -443,6 +477,8 @@ function handlePatchError(
 ): void {
   setStatus(statusMessage, `Error: ${error}`, 'error');
   previewBtn.disabled = false;
+  previewBtn.setAttribute('aria-disabled', 'false');
+  previewBtn.focus(); // Return focus to the preview button
 }
 
 /**
@@ -482,8 +518,11 @@ function resetUI(
 ): void {
   previewArea.style.display = 'none';
   previewBtn.disabled = false;
+  previewBtn.setAttribute('aria-disabled', 'false');
   applyBtn.disabled = true;
+  applyBtn.setAttribute('aria-disabled', 'true');
   cancelBtn.disabled = true;
+  cancelBtn.setAttribute('aria-disabled', 'true');
   setStatus(statusMessage, 'Ready to parse your unified diff.', 'normal');
 }
 

@@ -86,7 +86,10 @@ export default [
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 2022,
-      sourceType: 'module'
+      sourceType: 'module',
+      parserOptions: {
+        project: './tsconfig.webview.json'  // Add this line
+      }
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',

@@ -352,51 +352,58 @@ export class PatchPanel {
     const nonce = getNonce();
     
     return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; img-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-  <link href="${styleUri}" rel="stylesheet">
-  <title>PatchPilot: Paste Diff</title>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div class="logo-container">
-        <img src="${logoUri}" alt="PatchPilot Logo" class="logo" width="48" height="48">
-        <h1>PatchPilot: Paste Unified Diff</h1>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; img-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+    <link href="${styleUri}" rel="stylesheet">
+    <title>PatchPilot: Paste Diff</title>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header" role="banner">
+        <div class="logo-container">
+          <img src="${logoUri}" alt="PatchPilot Logo" class="logo" width="48" height="48">
+          <h1>PatchPilot: Paste Unified Diff</h1>
+        </div>
+        <p id="app-description">Paste your patch below and click "Preview" to see changes before applying.</p>
+      </header>
+      
+      <main>
+        <div class="editor-container">
+          <label for="patch-input" id="patch-input-label" class="sr-only">Unified diff code</label>
+          <textarea id="patch-input" 
+            aria-labelledby="patch-input-label" 
+            aria-describedby="app-description" 
+            placeholder="Paste unified diff here..." 
+            spellcheck="false"></textarea>
+        </div>
+        
+        <section class="preview-container" id="preview-area" style="display:none;" aria-labelledby="preview-heading">
+          <h2 id="preview-heading">Patch Preview</h2>
+          <div id="file-list" role="list" aria-label="Files affected by patch"></div>
+        </section>
+        
+        <div class="button-container" role="group" aria-label="Patch actions">
+          <button id="preview-btn" class="btn primary">Preview</button>
+          <button id="apply-btn" class="btn success" disabled aria-disabled="true">Apply Patch</button>
+          <button id="cancel-btn" class="btn danger" disabled aria-disabled="true">Cancel</button>
+        </div>
+      </main>
+      
+      <div class="status-bar" role="status" aria-live="polite">
+        <div id="status-message">Ready to parse your unified diff.</div>
       </div>
-      <p>Paste your patch below and click "Preview" to see changes before applying.</p>
+      
+      <div class="footer">
+        <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and header will be automatically fixed.</p>
+      </div>
     </div>
     
-    <div class="editor-container">
-      <textarea id="patch-input" placeholder="Paste unified diff here..." spellcheck="false"></textarea>
-    </div>
-    
-    <div class="preview-container" id="preview-area" style="display:none;">
-      <h2>Patch Preview</h2>
-      <div id="file-list"></div>
-    </div>
-    
-    <div class="button-container">
-      <button id="preview-btn" class="btn primary">Preview</button>
-      <button id="apply-btn" class="btn success" disabled>Apply Patch</button>
-      <button id="cancel-btn" class="btn danger" disabled>Cancel</button>
-    </div>
-    
-    <div class="status-bar">
-      <div id="status-message">Ready to parse your unified diff.</div>
-    </div>
-    
-    <div class="footer">
-      <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and header will be automatically fixed.</p>
-    </div>
-  </div>
-  
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+    <script nonce="${nonce}" src="${scriptUri}"></script>
+  </body>
+  </html>`;
   }
   
   /**
