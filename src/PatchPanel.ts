@@ -292,38 +292,44 @@ export class PatchPanel {
   }
   
   /**
-   * Handles the create branch request from the webview
-   * @param branchName Optional custom branch name
-   */
-  private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
-    trackEvent('webview_action', { action: 'createBranch' });
+ * Handles the create branch request from the webview
+ * @param branchName Optional custom branch name
+ */
+private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
+  trackEvent('webview_action', { action: 'createBranch' });
+  
+  this._outputChannel.appendLine(`Creating branch with name: ${branchName || '(default)'}`);
+  
+  try {
+    // Execute the command to create a branch
+    const createdBranchName = await vscode.commands.executeCommand('patchPilot.createBranch', branchName);
     
-    try {
-      // Execute the command to create a branch
-      const createdBranchName = await vscode.commands.executeCommand('patchPilot.createBranch', branchName);
-      
-      // Send success message back to webview
-      this._panel.webview.postMessage({
-        command: 'branchCreated',
-        branchName: createdBranchName
-      } as ExtensionMessage);
-      
-    } catch (err) {
-      const errorMessage = `Failed to create branch: ${err instanceof Error ? err.message : String(err)}`;
-      vscode.window.showErrorMessage(errorMessage);
-      
-      // Send error back to webview
-      this._panel.webview.postMessage({
-        command: 'branchError',
-        error: errorMessage
-      } as ExtensionMessage);
-      
-      // Track the error
-      trackEvent('branch_error', { 
-        error: err instanceof Error ? err.message : String(err) 
-      });
-    }
+    this._outputChannel.appendLine(`Branch created successfully: ${createdBranchName}`);
+    
+    // Send success message back to webview
+    this._panel.webview.postMessage({
+      command: 'branchCreated',
+      branchName: createdBranchName
+    } as ExtensionMessage);
+    
+  } catch (err) {
+    const errorMessage = `Failed to create branch: ${err instanceof Error ? err.message : String(err)}`;
+    this._outputChannel.appendLine(`Error creating branch: ${errorMessage}`);
+    
+    vscode.window.showErrorMessage(errorMessage);
+    
+    // Send error back to webview
+    this._panel.webview.postMessage({
+      command: 'branchError',
+      error: errorMessage
+    } as ExtensionMessage);
+    
+    // Track the error
+    trackEvent('branch_error', { 
+      error: err instanceof Error ? err.message : String(err) 
+    });
   }
+}
   
   /**
    * Handles checking the clipboard for a patch

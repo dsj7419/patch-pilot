@@ -71,6 +71,8 @@ let _currentSettings: ExtensionSettings = {
 };
 
 // Main initialization function
+// File: webview/main.ts
+
 function initialize() {
   // Get DOM elements with proper type casting
   const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
@@ -80,6 +82,10 @@ function initialize() {
   const applyBtn = document.getElementById('apply-btn') as HTMLButtonElement;
   const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
   const statusMessage = document.getElementById('status-message') as HTMLDivElement;
+  
+  // Get Git action elements
+  const createBranchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement | null;
+  const branchNameInput = document.getElementById('branch-name-input') as HTMLInputElement | null;
 
   // Restore any cached state from VS Code API
   const state = vscode.getState();
@@ -101,8 +107,6 @@ function initialize() {
   previewBtn.addEventListener('click', () => handlePreviewClick(patchInput, previewBtn, statusMessage));
   applyBtn.addEventListener('click', () => handleApplyClick(applyBtn, cancelBtn, statusMessage));
   cancelBtn.addEventListener('click', () => handleCancelClick(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage));
-  const createBranchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement;
-  const branchNameInput = document.getElementById('branch-name-input') as HTMLInputElement;
   
   // Listen for changes to save state
   patchInput.addEventListener('input', () => {
@@ -116,19 +120,21 @@ function initialize() {
     }
   });
 
-  // Setup Git action event listeners
-createBranchBtn.addEventListener('click', () => {
-  const branchName = branchNameInput.value.trim();
-  vscode.postMessage({
-    command: 'createBranchRequest',
-    branchName: branchName === '' ? undefined : branchName
-  });
-  
-  // Set status message
-  setStatus(statusMessage, 'Creating branch...', 'normal');
-  createBranchBtn.disabled = true;
-  createBranchBtn.setAttribute('aria-disabled', 'true');
-});
+  // Setup Git action event listeners - safely handle potential null elements
+  if (createBranchBtn && branchNameInput) {
+    createBranchBtn.addEventListener('click', () => {
+      const branchName = branchNameInput.value.trim();
+      vscode.postMessage({
+        command: 'createBranchRequest',
+        branchName: branchName === '' ? undefined : branchName
+      });
+      
+      // Set status message
+      setStatus(statusMessage, 'Creating branch...', 'normal');
+      createBranchBtn.disabled = true;
+      createBranchBtn.setAttribute('aria-disabled', 'true');
+    });
+  }
   
   // Handle keyboard shortcuts
   patchInput.addEventListener('keydown', (e) => {
@@ -174,28 +180,28 @@ createBranchBtn.addEventListener('click', () => {
       case 'branchCreated':
         if (message.branchName) {
           setStatus(statusMessage, `Created and switched to branch '${message.branchName}'.`, 'success');
-          // Clear the branch name input
-          const branchNameInput = document.getElementById('branch-name-input') as HTMLInputElement;
-          if (branchNameInput) {
-            branchNameInput.value = '';
+          // Clear the branch name input - safely handle potential null
+          const branchInput = document.getElementById('branch-name-input') as HTMLInputElement | null;
+          if (branchInput) {
+            branchInput.value = '';
           }
         }
-        // Re-enable the create branch button
-        const createBranchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement;
-        if (createBranchBtn) {
-          createBranchBtn.disabled = false;
-          createBranchBtn.setAttribute('aria-disabled', 'false');
+        // Re-enable the create branch button - safely handle potential null
+        const branchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement | null;
+        if (branchBtn) {
+          branchBtn.disabled = false;
+          branchBtn.setAttribute('aria-disabled', 'false');
         }
         break;
       case 'branchError':
         if (message.error) {
           setStatus(statusMessage, message.error, 'error');
         }
-        // Re-enable the create branch button
-        const createBranchBtnError = document.getElementById('create-branch-btn') as HTMLButtonElement;
-        if (createBranchBtnError) {
-          createBranchBtnError.disabled = false;
-          createBranchBtnError.setAttribute('aria-disabled', 'false');
+        // Re-enable the create branch button - safely handle potential null
+        const branchBtnError = document.getElementById('create-branch-btn') as HTMLButtonElement | null;
+        if (branchBtnError) {
+          branchBtnError.disabled = false;
+          branchBtnError.setAttribute('aria-disabled', 'false');
         }
         break;
       case 'patchError':
