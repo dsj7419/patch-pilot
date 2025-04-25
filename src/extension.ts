@@ -91,25 +91,47 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
   
   // Register the create branch command for quick branching before applying a patch
-  context.subscriptions.push(
-    vscode.commands.registerCommand('patchPilot.createBranch', async (branchName?: string): Promise<string> => {
-      // Track API usage
-      trackEvent('api_called', { method: 'createBranch' });
-      
-      try {
-        // Create a branch for the patch
-        return await createTempBranch(branchName);
-      } catch (error) {
-        // Track error
-        trackEvent('api_error', { 
-          method: 'createBranch',
-          error: error instanceof Error ? error.message : String(error)
+context.subscriptions.push(
+  vscode.commands.registerCommand('patchPilot.createBranch', async (branchName?: string): Promise<string> => {
+    // Track API usage
+    trackEvent('api_called', { method: 'createBranch' });
+    
+    try {
+      // If branchName is not provided, show input box to get it from user
+      if (branchName === undefined) {
+        const defaultBranchName = `patchpilot/${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        branchName = await vscode.window.showInputBox({
+          prompt: 'Enter a name for the new branch',
+          placeHolder: defaultBranchName,
+          value: defaultBranchName
         });
         
-        throw error;
+        // If user cancelled the input box, show message and return
+        if (branchName === undefined) {
+          vscode.window.showInformationMessage('Branch creation cancelled.');
+          throw new Error('Branch creation cancelled');
+        }
+        
+        // Track if a custom name was provided (not using the default)
+        trackEvent('command_executed', { 
+          command: 'createBranch', 
+          customName: branchName !== defaultBranchName && branchName !== ''
+        });
       }
-    })
-  );
+      
+      // Create a branch for the patch
+      return await createTempBranch(branchName === '' ? undefined : branchName);
+    } catch (error) {
+      // Track error
+      trackEvent('api_error', { 
+        method: 'createBranch',
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      throw error;
+    }
+  })
+);
   
   // Register configuration change handler to react to settings updates
   context.subscriptions.push(

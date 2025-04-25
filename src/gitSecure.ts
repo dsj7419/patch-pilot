@@ -67,6 +67,42 @@ export interface GitOptions {
 }
 
 /**
+ * Checks if an error is a Git dubious ownership error and shows a helpful message
+ * @param error The error to check
+ * @param outputChannel Optional output channel for logging
+ * @returns True if the error was a dubious ownership error
+ */
+function handleDubiousOwnershipError(error: unknown, outputChannel?: vscode.OutputChannel): boolean {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  // Check if the error message contains the "dubious ownership" text
+  if (errorMessage.includes('detected dubious ownership')) {
+    // Get workspace path
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return false;
+    }
+    
+    const workspacePath = workspaceFolders[0].uri.fsPath;
+    
+    // Show a specific error message to the user
+    vscode.window.showErrorMessage(
+      `Git security check failed: Repository ownership mismatch detected in '${workspacePath}'. Please run 'git config --global --add safe.directory ${workspacePath}' in your terminal (outside of VS Code Admin terminals if applicable) and restart VS Code to resolve this.`,
+      { modal: true }
+    );
+    
+    // Log to output channel if provided
+    if (outputChannel) {
+      outputChannel.appendLine(`Dubious ownership error detected for workspace: ${workspacePath}`);
+    }
+    
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Gets the Git instance for the workspace with validation
  * @param options Configuration options
  * @returns SimpleGit instance or throws if not a Git repository
@@ -108,6 +144,11 @@ async function getGitInstance(options?: GitOptions): Promise<SimpleGit> {
     
     return git;
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      throw new GitError('Git repository ownership check failed');
+    }
+    
     // Log the error with context - avoid exposing full error details
     outputChannel.appendLine(`Error initializing Git: ${error instanceof Error ? error.message : 'Unknown error'}`);
     outputChannel.show();
@@ -153,6 +194,11 @@ export async function detectGit(options?: GitOptions): Promise<GitDetectionResul
     
     return { isGitRepo: false, workspacePath };
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      return { isGitRepo: false, workspacePath };
+    }
+    
     // Log the error - avoid exposing full error details
     outputChannel.appendLine(`Error detecting Git: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
@@ -247,6 +293,11 @@ export async function autoStageFiles(
     // Confirm with message
     vscode.window.showInformationMessage(`Staged ${validPaths.length} file(s) to Git.`);
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      return;
+    }
+    
     // Log the error
     outputChannel.appendLine(`Error staging files: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
@@ -357,6 +408,11 @@ export async function createTempBranch(
     
     return actualBranchName;
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      throw new GitError('Git repository ownership check failed');
+    }
+    
     // Log the error
     outputChannel.appendLine(`Error creating branch: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
@@ -419,6 +475,20 @@ export async function getGitStatus(options?: GitOptions): Promise<GitStatus> {
       currentBranch: status.current || undefined
     };
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      // Return an empty status object on dubious ownership error
+      return {
+        isClean: true,
+        staged: [],
+        modified: [],
+        created: [],
+        deleted: [],
+        renamed: [],
+        isDetachedHead: false
+      };
+    }
+    
     // Log the error
     outputChannel.appendLine(`Error getting Git status: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
@@ -607,6 +677,11 @@ export async function createCommit(
     
     return result.commit;
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      throw new GitError('Git repository ownership check failed');
+    }
+    
     // Log the error
     outputChannel.appendLine(`Error creating commit: ${error instanceof Error ? error.message : 'Unknown error'}`);
     
@@ -661,6 +736,11 @@ export async function getLastCommitFiles(options?: GitOptions): Promise<string[]
     
     return result.split('\n').filter(line => line.trim() !== '');
   } catch (error) {
+    // Check for dubious ownership error
+    if (handleDubiousOwnershipError(error, outputChannel)) {
+      return [];
+    }
+    
     // Log the error
     outputChannel.appendLine(`Error getting last commit files: ${error instanceof Error ? error.message : 'Unknown error'}`);
     

@@ -123,6 +123,48 @@ p {
   background-color: var(--vscode-list-hoverBackground);
 }
 
+/* Git actions container styles */
+.git-actions-container {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 4px;
+}
+
+.git-actions-container h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1em;
+  color: var(--vscode-editor-foreground);
+}
+
+.git-action-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.git-action-input-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 5px;
+}
+
+.branch-name-input {
+  flex: 1;
+  padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+  border: 1px solid var(--vscode-input-border);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-family: var(--vscode-font-family);
+}
+
+.branch-name-input:focus {
+  outline: var(--focus-outline-width) solid var(--vscode-focusBorder);
+  outline-offset: var(--focus-outline-offset);
+}
+
 /* Focus styles for keyboard navigation */
 .file-entry:focus {
   outline: var(--focus-outline-width) solid var(--vscode-focusBorder);

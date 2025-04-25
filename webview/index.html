@@ -211,6 +211,17 @@
       <p>Paste your patch below and click "Preview" to see changes before applying.</p>
     </div>
     
+    <div class="git-actions-container" role="group" aria-label="Git actions">
+      <h3>Git Actions</h3>
+      <div class="git-action-group">
+        <label for="branch-name-input">Branch Name (optional):</label>
+        <div class="git-action-input-group">
+          <input type="text" id="branch-name-input" class="branch-name-input" placeholder="Enter custom branch name">
+          <button id="create-branch-btn" class="btn primary">Create Branch</button>
+        </div>
+      </div>
+    </div>
+
     <div class="editor-container">
       <textarea id="patch-input" placeholder="Paste unified diff here..."></textarea>
     </div>

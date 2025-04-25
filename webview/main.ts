@@ -38,17 +38,19 @@ interface WebviewState {
 
 // All possible message types that can be sent between webview and extension
 interface WebviewMessage {
-  command: 'applyPatch' | 'previewPatch' | 'cancelPatch' | 'requestSettings' | 'checkClipboard';
+  command: 'applyPatch' | 'previewPatch' | 'cancelPatch' | 'requestSettings' | 'checkClipboard' | 'createBranchRequest';
   patchText?: string;
+  branchName?: string;
 }
 
 interface ExtensionMessage {
-  command: 'patchPreview' | 'patchResults' | 'patchError' | 'updateSettings' | 'clipboardContent';
+  command: 'patchPreview' | 'patchResults' | 'patchError' | 'updateSettings' | 'clipboardContent' | 'branchCreated' | 'branchError';
   fileInfo?: FileInfo[];
   results?: PatchResult[];
   error?: string;
   config?: ExtensionSettings;
   patchText?: string;
+  branchName?: string;
 }
 
 // Using underscore prefix to indicate intentionally unused interface
@@ -99,6 +101,8 @@ function initialize() {
   previewBtn.addEventListener('click', () => handlePreviewClick(patchInput, previewBtn, statusMessage));
   applyBtn.addEventListener('click', () => handleApplyClick(applyBtn, cancelBtn, statusMessage));
   cancelBtn.addEventListener('click', () => handleCancelClick(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage));
+  const createBranchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement;
+  const branchNameInput = document.getElementById('branch-name-input') as HTMLInputElement;
   
   // Listen for changes to save state
   patchInput.addEventListener('input', () => {
@@ -111,6 +115,20 @@ function initialize() {
       resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
     }
   });
+
+  // Setup Git action event listeners
+createBranchBtn.addEventListener('click', () => {
+  const branchName = branchNameInput.value.trim();
+  vscode.postMessage({
+    command: 'createBranchRequest',
+    branchName: branchName === '' ? undefined : branchName
+  });
+  
+  // Set status message
+  setStatus(statusMessage, 'Creating branch...', 'normal');
+  createBranchBtn.disabled = true;
+  createBranchBtn.setAttribute('aria-disabled', 'true');
+});
   
   // Handle keyboard shortcuts
   patchInput.addEventListener('keydown', (e) => {
@@ -151,6 +169,33 @@ function initialize() {
       case 'patchResults':
         if (message.results) {
           handlePatchResults(message.results, previewArea, patchInput, applyBtn, cancelBtn, previewBtn, statusMessage);
+        }
+        break;
+      case 'branchCreated':
+        if (message.branchName) {
+          setStatus(statusMessage, `Created and switched to branch '${message.branchName}'.`, 'success');
+          // Clear the branch name input
+          const branchNameInput = document.getElementById('branch-name-input') as HTMLInputElement;
+          if (branchNameInput) {
+            branchNameInput.value = '';
+          }
+        }
+        // Re-enable the create branch button
+        const createBranchBtn = document.getElementById('create-branch-btn') as HTMLButtonElement;
+        if (createBranchBtn) {
+          createBranchBtn.disabled = false;
+          createBranchBtn.setAttribute('aria-disabled', 'false');
+        }
+        break;
+      case 'branchError':
+        if (message.error) {
+          setStatus(statusMessage, message.error, 'error');
+        }
+        // Re-enable the create branch button
+        const createBranchBtnError = document.getElementById('create-branch-btn') as HTMLButtonElement;
+        if (createBranchBtnError) {
+          createBranchBtnError.disabled = false;
+          createBranchBtnError.setAttribute('aria-disabled', 'false');
         }
         break;
       case 'patchError':

@@ -14,6 +14,7 @@ import { ApplyResult, FileInfo } from './types/patchTypes';
 interface WebviewMessage {
   command: string;
   patchText?: string;
+  branchName?: string;
 }
 
 /**
@@ -26,6 +27,7 @@ interface ExtensionMessage {
   error?: string;
   config?: Record<string, unknown>;
   patchText?: string;
+  branchName?: string;
 }
 
 /**
@@ -121,6 +123,9 @@ export class PatchPanel {
             break;
           case 'cancelPatch':
             this._handleCancelPatch();
+            break;
+          case 'createBranchRequest':
+            await this._handleCreateBranchRequest(message.branchName);
             break;
           case 'requestSettings':
             this._postSettingsToWebview();
@@ -287,6 +292,40 @@ export class PatchPanel {
   }
   
   /**
+   * Handles the create branch request from the webview
+   * @param branchName Optional custom branch name
+   */
+  private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
+    trackEvent('webview_action', { action: 'createBranch' });
+    
+    try {
+      // Execute the command to create a branch
+      const createdBranchName = await vscode.commands.executeCommand('patchPilot.createBranch', branchName);
+      
+      // Send success message back to webview
+      this._panel.webview.postMessage({
+        command: 'branchCreated',
+        branchName: createdBranchName
+      } as ExtensionMessage);
+      
+    } catch (err) {
+      const errorMessage = `Failed to create branch: ${err instanceof Error ? err.message : String(err)}`;
+      vscode.window.showErrorMessage(errorMessage);
+      
+      // Send error back to webview
+      this._panel.webview.postMessage({
+        command: 'branchError',
+        error: errorMessage
+      } as ExtensionMessage);
+      
+      // Track the error
+      trackEvent('branch_error', { 
+        error: err instanceof Error ? err.message : String(err) 
+      });
+    }
+  }
+  
+  /**
    * Handles checking the clipboard for a patch
    */
   private async _handleCheckClipboard(): Promise<void> {
@@ -371,6 +410,17 @@ export class PatchPanel {
       </header>
       
       <main>
+        <div class="git-actions-container" role="group" aria-label="Git actions">
+          <h3>Git Actions</h3>
+          <div class="git-action-group">
+            <label for="branch-name-input">Branch Name (optional):</label>
+            <div class="git-action-input-group">
+              <input type="text" id="branch-name-input" class="branch-name-input" placeholder="Enter custom branch name">
+              <button id="create-branch-btn" class="btn primary">Create Branch</button>
+            </div>
+          </div>
+        </div>
+        
         <div class="editor-container">
           <label for="patch-input" id="patch-input-label" class="sr-only">Unified diff code</label>
           <textarea id="patch-input" 
