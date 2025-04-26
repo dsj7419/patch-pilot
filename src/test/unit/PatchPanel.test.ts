@@ -270,90 +270,6 @@ describe('PatchPanel', () => {
       );
     });
     
-    it('should handle createBranchRequest message with branch name', async () => {
-      // Call the handler with a createBranchRequest message
-      await messageHandler({
-        command: 'createBranchRequest',
-        branchName: 'feature-branch'
-      });
-      
-      // Should execute the createBranch command
-      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        'patchPilot.createBranch',
-        'feature-branch'
-      );
-      
-      // Should send success message back to webview
-      expect(mockWebview.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: 'branchCreated',
-          branchName: 'feature-branch'
-        })
-      );
-      
-      // Should track the action
-      expect(trackEvent).toHaveBeenCalledWith(
-        'webview_action',
-        expect.objectContaining({ action: 'createBranch' })
-      );
-    });
-    
-    it('should handle createBranchRequest message without branch name', async () => {
-      // Call the handler without a branch name
-      await messageHandler({
-        command: 'createBranchRequest'
-      });
-      
-      // Should execute the createBranch command with undefined
-      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        'patchPilot.createBranch',
-        undefined
-      );
-      
-      // Should send success message back to webview
-      expect(mockWebview.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: 'branchCreated',
-          branchName: 'default-branch'
-        })
-      );
-    });
-    
-    it('should handle branch creation failure', async () => {
-      // Call the handler with a branch name that will cause failure
-      await messageHandler({
-        command: 'createBranchRequest',
-        branchName: 'failing-branch'
-      });
-      
-      // Should execute the createBranch command
-      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-        'patchPilot.createBranch',
-        'failing-branch'
-      );
-      
-      // Should show error message
-      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to create branch')
-      );
-      
-      // Should send error message back to webview
-      expect(mockWebview.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: 'branchError',
-          error: expect.stringContaining('Failed to create branch')
-        })
-      );
-      
-      // Should track the error
-      expect(trackEvent).toHaveBeenCalledWith(
-        'branch_error',
-        expect.objectContaining({
-          error: expect.stringContaining('Failed to create branch')
-        })
-      );
-    });
-    
     it('should handle requestSettings message', async () => {
       // Mock getConfiguration
       (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
@@ -660,7 +576,7 @@ describe('PatchPanel', () => {
       PatchPanel.currentPanel = undefined;
     });
     
-    it('should initialize HTML content correctly', () => {
+    it('should initialize HTML content without Git actions container', () => {
       // Create panel
       PatchPanel.createOrShow(extensionUri);
       
@@ -674,14 +590,17 @@ describe('PatchPanel', () => {
       expect(mockWebviewPanel.webview.html).toContain('id="preview-btn"');
       expect(mockWebviewPanel.webview.html).toContain('id="apply-btn"');
       
-      // Verify it contains the Git actions section
-      expect(mockWebviewPanel.webview.html).toContain('class="git-actions-container"');
-      expect(mockWebviewPanel.webview.html).toContain('id="branch-name-input"');
-      expect(mockWebviewPanel.webview.html).toContain('id="create-branch-btn"');
+      // Verify it does NOT contain the Git actions section
+      expect(mockWebviewPanel.webview.html).not.toContain('class="git-actions-container"');
+      expect(mockWebviewPanel.webview.html).not.toContain('id="branch-name-input"');
+      expect(mockWebviewPanel.webview.html).not.toContain('id="create-branch-btn"');
+      
+      // Verify it contains the new tip about using Command Palette
+      expect(mockWebviewPanel.webview.html).toContain('To create a branch for your patch, use');
+      expect(mockWebviewPanel.webview.html).toContain('Ctrl+Shift+P');
       
       // Verify CSP is properly set
       expect(mockWebviewPanel.webview.html).toContain('Content-Security-Policy');
-      expect(mockWebviewPanel.webview.html).toContain(`'nonce-${getNonce()}'`);
       
       // Clean up
       PatchPanel.currentPanel?.dispose();
