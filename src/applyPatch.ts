@@ -261,10 +261,18 @@ async function showPatchPreview(
 
 export function extractFilePath(p: DiffParsedPatch): string | undefined {
   if (p.newFileName && p.newFileName !== '/dev/null') {
-    return p.newFileName.replace(/^b\//, '');
+    // Clean both actual control characters and escaped character sequences
+    return p.newFileName.replace(/^b\//, '')
+      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
+      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .trim();
   }
   if (p.oldFileName && p.oldFileName !== '/dev/null') {
-    return p.oldFileName.replace(/^a\//, '');
+    // Clean both actual control characters and escaped character sequences
+    return p.oldFileName.replace(/^a\//, '')
+      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
+      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .trim();
   }
   return undefined;
 }
@@ -336,9 +344,19 @@ function fullDocRange(doc: vscode.TextDocument): vscode.Range {
 /* ───────────────────── Parse‑only helper for WebView ───────────────────── */
 
 export async function parsePatch(patchText: string): Promise<FileInfo[]> {
-  const patches = DiffLib.parsePatch(
-    normalizeDiff(patchText),
-  ) as DiffParsedPatch[];
+  const cleanPatchText = patchText.replace(/\\r\\n|\\r|\\n/g, '');
+  
+  const normalized = normalizeDiff(cleanPatchText);
+  const patches = DiffLib.parsePatch(normalized) as DiffParsedPatch[];
+
+  // eslint-disable-next-line no-console
+  console.log("Normalized diff:", normalizeDiff);
+  patches.forEach((p, i) => {
+    // eslint-disable-next-line no-console
+    console.log(`Patch ${i} oldFileName:`, p.oldFileName);
+    // eslint-disable-next-line no-console
+    console.log(`Patch ${i} newFileName:`, p.newFileName);
+  });
 
   const info: FileInfo[] = [];
 

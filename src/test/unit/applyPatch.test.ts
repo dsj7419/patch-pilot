@@ -161,6 +161,24 @@ describe('Apply Patch Module', () => {
       
       expect(extractFilePath(patch)).toBe('long/path/to/file.ts');
     });
+
+    it('should handle filenames with trailing control characters', () => {
+        const patch = createMockParsedPatch({
+          oldFileName: 'a/src/file.ts\r\n',
+          newFileName: 'b/src/file.ts\r\n'
+        });
+        
+        expect(extractFilePath(patch)).toBe('src/file.ts');
+      });
+      
+      it('should handle filenames with escaped control character sequences', () => {
+        const patch = createMockParsedPatch({
+          oldFileName: 'a/src/file.ts\\r\\n',
+          newFileName: 'b/src/file.ts\\r\\n'
+        });
+        
+        expect(extractFilePath(patch)).toBe('src/file.ts');
+      });
   });
 
   describe('applyPatchToContent', () => {

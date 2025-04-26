@@ -285,6 +285,13 @@ import {
         expect(oldFile).toBeUndefined();
         expect(newFile).toBeUndefined();
       });
+
+      it('should handle headers with escaped control character sequences', () => {
+        const header = 'diff --git a/src/file.ts\\r\\n b/src/file.ts\\r\\n';
+        const { oldFile, newFile } = extractFileNamesFromHeader(header);
+        expect(oldFile).toBe('src/file.ts');
+        expect(newFile).toBe('src/file.ts');
+      });
     });
   
     describe('debounce', () => {

@@ -79,7 +79,12 @@ export function addMissingHeaders(diffText: string): string {
  * @returns Normalized diff
  */
 export function normalizeDiff(diffText: string): string {
+  // First, normalize actual line endings
   let normalized = normalizeLineEndings(diffText);
+  
+  // Then handle escaped control characters that appear as literal strings
+  normalized = normalized.replace(/\\r\\n|\\r|\\n/g, '');
+  
   normalized = autoFixSpaces(normalized);
   normalized = addMissingHeaders(normalized);
   return normalized;
@@ -94,7 +99,16 @@ export function extractFileNamesFromHeader(diffHeader: string): { oldFile?: stri
   // diff --git a/path/to/file.txt b/path/to/file.txt
   const gitHeaderMatch = diffHeader.match(/^diff --git a\/(.*) b\/(.*)$/);
   if (gitHeaderMatch) {
-    return { oldFile: gitHeaderMatch[1], newFile: gitHeaderMatch[2] };
+    // Clean both actual control characters and escaped character sequences
+    const oldFile = gitHeaderMatch[1]
+      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
+      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .trim();
+    const newFile = gitHeaderMatch[2]
+      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
+      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .trim();
+    return { oldFile, newFile };
   }
   
   return { oldFile: undefined, newFile: undefined };
