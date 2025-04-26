@@ -14,7 +14,7 @@ import { ApplyResult, FileInfo } from './types/patchTypes';
 interface WebviewMessage {
   command: string;
   patchText?: string;
-  branchName?: string;
+  data?: unknown;
 }
 
 /**
@@ -27,7 +27,7 @@ interface ExtensionMessage {
   error?: string;
   config?: Record<string, unknown>;
   patchText?: string;
-  branchName?: string;
+  data?: unknown;
 }
 
 /**
@@ -44,30 +44,24 @@ export class PatchPanel {
   
   /**
    * Creates or shows the patch panel
-   * @param extensionUri The extension URI for loading resources
    */
   public static createOrShow(extensionUri: vscode.Uri): void {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
       
-    // If we already have a panel, show it
     if (PatchPanel.currentPanel) {
       PatchPanel.currentPanel._panel.reveal(column);
       return;
     }
     
-    // Otherwise, create a new panel
     const panel = vscode.window.createWebviewPanel(
       PatchPanel.viewType,
       'PatchPilot: Paste Diff',
       column || vscode.ViewColumn.One,
       {
-        // Enable scripts in the webview
         enableScripts: true,
-        // Retain panel state when hidden
         retainContextWhenHidden: true,
-        // Restrict the webview to only load resources from the extension
         localResourceRoots: [
           vscode.Uri.joinPath(extensionUri, 'webview'),
           vscode.Uri.joinPath(extensionUri, 'out'),
@@ -90,49 +84,49 @@ export class PatchPanel {
   
   /**
    * Creates a new panel instance
-   * @param panel The webview panel
-   * @param extensionUri The extension URI for loading resources
    */
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._outputChannel = vscode.window.createOutputChannel('PatchPilot');
     
-    // Set the webview's HTML content
     this._update();
     
-    // Listen for when the panel is disposed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     
-    // Listen for when the panel becomes active
     this._panel.onDidChangeViewState(e => {
       if (e.webviewPanel.active) {
         this._postSettingsToWebview();
       }
     }, null, this._disposables);
     
-    // Handle messages from the webview
     this._panel.webview.onDidReceiveMessage(
       async (message: WebviewMessage) => {
-        switch (message.command) {
-          case 'applyPatch':
-            await this._handleApplyPatch(message.patchText || '');
-            break;
-          case 'previewPatch':
-            await this._handlePreviewPatch(message.patchText || '');
-            break;
-          case 'cancelPatch':
-            this._handleCancelPatch();
-            break;
-          case 'createBranchRequest':
-            await this._handleCreateBranchRequest(message.branchName);
-            break;
-          case 'requestSettings':
-            this._postSettingsToWebview();
-            break;
-          case 'checkClipboard':
-            await this._handleCheckClipboard();
-            break;
+        try {
+          this._outputChannel.appendLine(`Received message: ${JSON.stringify(message)}`);
+          
+          switch (message.command) {
+            case 'applyPatch':
+              await this._handleApplyPatch(message.patchText || '');
+              break;
+            case 'previewPatch':
+              await this._handlePreviewPatch(message.patchText || '');
+              break;
+            case 'cancelPatch':
+              this._handleCancelPatch();
+              break;
+            case 'requestSettings':
+              this._postSettingsToWebview();
+              break;
+            case 'checkClipboard':
+              await this._handleCheckClipboard();
+              break;
+            default:
+              this._outputChannel.appendLine(`Unknown message command: ${message.command}`);
+          }
+        } catch (error) {
+          this._outputChannel.appendLine(`Error handling message: ${error instanceof Error ? error.message : String(error)}`);
+          vscode.window.showErrorMessage(`Operation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       },
       null,
@@ -156,7 +150,6 @@ export class PatchPanel {
   
   /**
    * Handles the apply patch command from the webview
-   * @param patchText The patch text to apply
    */
   private async _handleApplyPatch(patchText: string): Promise<void> {
     trackEvent('webview_action', { action: 'applyPatch' });
@@ -173,20 +166,17 @@ export class PatchPanel {
       return;
     }
     
-    // Get extension settings
     const config = vscode.workspace.getConfiguration('patchPilot');
     const autoStage = config.get<boolean>('autoStage', false);
     const fuzz = config.get<number>('fuzzFactor', 2);
     
     try {
-      // Apply the patch
       const results = await applyPatch(patchText, {
         preview: true,
         autoStage,
         fuzz: fuzz as 0|1|2|3
       });
       
-      // Show summary
       const successCount = results.filter((r: ApplyResult) => r.status === 'applied').length;
       const failCount = results.length - successCount;
       
@@ -195,7 +185,6 @@ export class PatchPanel {
       } else {
         vscode.window.showWarningMessage(`Applied ${successCount} patch(es), ${failCount} failed. Check output for details.`);
         
-        // Log failed patches to output channel
         this._outputChannel.appendLine(`--- PatchPilot Results (${new Date().toLocaleString()}) ---`);
         results.forEach((result: ApplyResult) => {
           if (result.status === 'failed') {
@@ -207,7 +196,6 @@ export class PatchPanel {
         this._outputChannel.show();
       }
       
-      // Track success and failure statistics
       trackEvent('patch_applied', { 
         successCount, 
         failCount,
@@ -215,8 +203,7 @@ export class PatchPanel {
         filesAttempted: results.length
       });
       
-      // Send results back to webview
-      this._panel.webview.postMessage({
+      await this._panel.webview.postMessage({
         command: 'patchResults',
         results
       } as ExtensionMessage);
@@ -226,7 +213,6 @@ export class PatchPanel {
       vscode.window.showErrorMessage(errorMessage);
       this._sendErrorToWebview(errorMessage);
       
-      // Track the error
       trackEvent('patch_error', { 
         error: err instanceof Error ? err.message : String(err) 
       });
@@ -235,7 +221,6 @@ export class PatchPanel {
   
   /**
    * Handles the preview patch command from the webview
-   * @param patchText The patch text to preview
    */
   private async _handlePreviewPatch(patchText: string): Promise<void> {
     trackEvent('webview_action', { action: 'previewPatch' });
@@ -253,7 +238,6 @@ export class PatchPanel {
     }
     
     try {
-      // Parse the patch to get file info without applying
       const fileInfo = await parsePatch(patchText);
       
       if (fileInfo.length === 0) {
@@ -262,7 +246,6 @@ export class PatchPanel {
         return;
       }
       
-      // Track the preview stats
       trackEvent('patch_preview', { 
         fileCount: fileInfo.length,
         missingFiles: fileInfo.filter(f => !f.exists).length,
@@ -270,8 +253,7 @@ export class PatchPanel {
         totalDeletions: fileInfo.reduce((sum, f) => sum + f.changes.deletions, 0)
       });
       
-      // Send preview info back to webview
-      this._panel.webview.postMessage({
+      await this._panel.webview.postMessage({
         command: 'patchPreview',
         fileInfo
       } as ExtensionMessage);
@@ -292,46 +274,6 @@ export class PatchPanel {
   }
   
   /**
- * Handles the create branch request from the webview
- * @param branchName Optional custom branch name
- */
-private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
-  trackEvent('webview_action', { action: 'createBranch' });
-  
-  this._outputChannel.appendLine(`Creating branch with name: ${branchName || '(default)'}`);
-  
-  try {
-    // Execute the command to create a branch
-    const createdBranchName = await vscode.commands.executeCommand('patchPilot.createBranch', branchName);
-    
-    this._outputChannel.appendLine(`Branch created successfully: ${createdBranchName}`);
-    
-    // Send success message back to webview
-    this._panel.webview.postMessage({
-      command: 'branchCreated',
-      branchName: createdBranchName
-    } as ExtensionMessage);
-    
-  } catch (err) {
-    const errorMessage = `Failed to create branch: ${err instanceof Error ? err.message : String(err)}`;
-    this._outputChannel.appendLine(`Error creating branch: ${errorMessage}`);
-    
-    vscode.window.showErrorMessage(errorMessage);
-    
-    // Send error back to webview
-    this._panel.webview.postMessage({
-      command: 'branchError',
-      error: errorMessage
-    } as ExtensionMessage);
-    
-    // Track the error
-    trackEvent('branch_error', { 
-      error: err instanceof Error ? err.message : String(err) 
-    });
-  }
-}
-  
-  /**
    * Handles checking the clipboard for a patch
    */
   private async _handleCheckClipboard(): Promise<void> {
@@ -339,8 +281,7 @@ private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
       const clipboardText = await vscode.env.clipboard.readText();
       
       if (clipboardText && isUnifiedDiff(clipboardText)) {
-        // Send the clipboard content to the webview
-        this._panel.webview.postMessage({
+        await this._panel.webview.postMessage({
           command: 'clipboardContent',
           patchText: clipboardText
         } as ExtensionMessage);
@@ -350,15 +291,12 @@ private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
         trackEvent('clipboard_check', { containsDiff: false });
       }
     } catch (err) {
-      // Log in a production-safe way using output channel
-      const output = vscode.window.createOutputChannel('PatchPilot Clipboard');
-      output.appendLine(`Error reading clipboard: ${err instanceof Error ? err.message : String(err)}`);
+      this._outputChannel.appendLine(`Error reading clipboard: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   
   /**
    * Sends an error to the webview
-   * @param error The error message
    */
   private _sendErrorToWebview(error: string): void {
     this._panel.webview.postMessage({
@@ -379,88 +317,80 @@ private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
   
   /**
    * Gets the HTML for the webview
-   * @param webview The webview instance
-   * @returns The HTML content
    */
-  private _getHtmlForWebview(webview: vscode.Webview): string {
-    // Get file paths
-    const scriptPath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'main.js');
-    const stylePath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'style.css');
-    const logoPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'logo.png');
+  /**
+ * Gets the HTML for the webview
+ */
+private _getHtmlForWebview(webview: vscode.Webview): string {
+  const scriptPath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'main.js');
+  const stylePath = vscode.Uri.joinPath(this._extensionUri, 'out', 'webview', 'style.css');
+  const logoPath = vscode.Uri.joinPath(this._extensionUri, 'media', 'logo.png');
+  
+  const scriptUri = webview.asWebviewUri(scriptPath);
+  const styleUri = webview.asWebviewUri(stylePath);
+  const logoUri = webview.asWebviewUri(logoPath);
+  
+  const nonce = getNonce();
+  
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; img-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+  <link href="${styleUri}" rel="stylesheet">
+  <title>PatchPilot: Paste Diff</title>
+</head>
+<body>
+  <div class="container">
+    <header class="header" role="banner">
+      <div class="logo-container">
+        <img src="${logoUri}" alt="PatchPilot Logo" class="logo" width="48" height="48">
+        <h1>PatchPilot: Paste Unified Diff</h1>
+      </div>
+      <p id="app-description">Paste your patch below and click "Preview" to see changes before applying.</p>
+    </header>
     
-    // Get URIs that work in the webview
-    const scriptUri = webview.asWebviewUri(scriptPath);
-    const styleUri = webview.asWebviewUri(stylePath);
-    const logoUri = webview.asWebviewUri(logoPath);
-    
-    // Use a nonce to only allow specific scripts to be run
-    const nonce = getNonce();
-    
-    return `<!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; img-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-    <link href="${styleUri}" rel="stylesheet">
-    <title>PatchPilot: Paste Diff</title>
-  </head>
-  <body>
-    <div class="container">
-      <header class="header" role="banner">
-        <div class="logo-container">
-          <img src="${logoUri}" alt="PatchPilot Logo" class="logo" width="48" height="48">
-          <h1>PatchPilot: Paste Unified Diff</h1>
-        </div>
-        <p id="app-description">Paste your patch below and click "Preview" to see changes before applying.</p>
-      </header>
-      
-      <main>
-        <div class="git-actions-container" role="group" aria-label="Git actions">
-          <h3>Git Actions</h3>
-          <div class="git-action-group">
-            <label for="branch-name-input">Branch Name (optional):</label>
-            <div class="git-action-input-group">
-              <input type="text" id="branch-name-input" class="branch-name-input" placeholder="Enter custom branch name">
-              <button id="create-branch-btn" class="btn primary">Create Branch</button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="editor-container">
-          <label for="patch-input" id="patch-input-label" class="sr-only">Unified diff code</label>
-          <textarea id="patch-input" 
-            aria-labelledby="patch-input-label" 
-            aria-describedby="app-description" 
-            placeholder="Paste unified diff here..." 
-            spellcheck="false"></textarea>
-        </div>
-        
-        <section class="preview-container" id="preview-area" style="display:none;" aria-labelledby="preview-heading">
-          <h2 id="preview-heading">Patch Preview</h2>
-          <div id="file-list" role="list" aria-label="Files affected by patch"></div>
-        </section>
-        
-        <div class="button-container" role="group" aria-label="Patch actions">
-          <button id="preview-btn" class="btn primary">Preview</button>
-          <button id="apply-btn" class="btn success" disabled aria-disabled="true">Apply Patch</button>
-          <button id="cancel-btn" class="btn danger" disabled aria-disabled="true">Cancel</button>
-        </div>
-      </main>
-      
-      <div class="status-bar" role="status" aria-live="polite">
-        <div id="status-message">Ready to parse your unified diff.</div>
+    <main>
+      <div class="editor-container">
+        <label for="patch-input" id="patch-input-label" class="sr-only">Unified diff code</label>
+        <textarea id="patch-input" 
+          aria-labelledby="patch-input-label" 
+          aria-describedby="app-description" 
+          placeholder="Paste unified diff here..." 
+          spellcheck="false"></textarea>
       </div>
       
-      <div class="footer">
-        <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and header will be automatically fixed.</p>
+      <section class="preview-container hidden" id="preview-area" aria-labelledby="preview-heading">
+        <h2 id="preview-heading">Patch Preview</h2>
+        <div id="file-list" role="list" aria-label="Files affected by patch"></div>
+      </section>
+      
+      <div class="button-container" role="group" aria-label="Patch actions">
+        <button id="preview-btn" class="btn primary">Preview</button>
+        <button id="apply-btn" class="btn success" disabled aria-disabled="true">Apply Patch</button>
+        <button id="cancel-btn" class="btn danger" disabled aria-disabled="true">Cancel</button>
       </div>
+    </main>
+    
+    <div class="status-bar" role="status" aria-live="polite">
+      <div id="status-message">Ready to parse your unified diff.</div>
     </div>
     
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-  </body>
-  </html>`;
-  }
+    <div id="debug-panel" class="debug-panel hidden">
+      <div id="debug-status">Debug: Ready</div>
+    </div>
+    
+    <div class="footer">
+      <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and header will be automatically fixed.</p>
+      <p class="tip"><strong>Tip:</strong> To create a branch for your patch, use <kbd>Ctrl+Shift+P</kbd> and search for "PatchPilot: Create Branch".</p>
+    </div>
+  </div>
+  
+  <script nonce="${nonce}" src="${scriptUri}"></script>
+</body>
+</html>`;
+}
   
   /**
    * Disposes of the panel resources
@@ -468,7 +398,6 @@ private async _handleCreateBranchRequest(branchName?: string): Promise<void> {
   public dispose(): void {
     PatchPanel.currentPanel = undefined;
     
-    // Clean up resources
     this._panel.dispose();
     
     while (this._disposables.length) {
