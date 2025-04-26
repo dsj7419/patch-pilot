@@ -5,12 +5,15 @@
 // Make this file a module by adding an export
 export {};
 
-// Define the VS Code API interface
-declare function acquireVsCodeApi(): {
+// Define the VS Code API type
+interface VSCodeAPI {
   getState(): WebviewState | undefined;
   setState(state: WebviewState): void;
   postMessage(message: WebviewMessage): void;
-};
+}
+
+// Define the VS Code API function
+declare function acquireVsCodeApi(): VSCodeAPI;
 
 // Define interface for window extensions
 interface CustomWindow extends Window {
@@ -94,7 +97,7 @@ const logToDiagnostics = (message: string) => {
 document.addEventListener('DOMContentLoaded', createDiagnosticsDom);
 
 // Get the VS Code API
-let vscode;
+let vscode: VSCodeAPI | undefined;
 try {
   vscode = acquireVsCodeApi();
   window.addEventListener('load', () => {
@@ -164,20 +167,24 @@ function initialize() {
   debugLog('DOM elements loaded successfully');
 
   // Restore any cached state from VS Code API
-  const state = vscode.getState();
-  if (state && state.patchText) {
-    patchInput.value = state.patchText;
-    currentPatchText = state.patchText;
+  if (vscode) {
+    const state = vscode.getState();
+    if (state && state.patchText) {
+      patchInput.value = state.patchText;
+      currentPatchText = state.patchText;
+    }
   }
   
   // Focus the input
   patchInput.focus();
   
   // Request current settings from extension
-  vscode.postMessage({ command: 'requestSettings' });
+  if (vscode) {
+    vscode.postMessage({ command: 'requestSettings' });
   
-  // Check clipboard for diff content
-  vscode.postMessage({ command: 'checkClipboard' });
+    // Check clipboard for diff content
+    vscode.postMessage({ command: 'checkClipboard' });
+  }
   
   // Setup event listeners
   previewBtn.addEventListener('click', () => {
@@ -200,7 +207,9 @@ function initialize() {
     const text = patchInput.value;
     if (text !== currentPatchText) {
       currentPatchText = text;
-      vscode.setState({ patchText: text });
+      if (vscode) {
+        vscode.setState({ patchText: text });
+      }
       
       // Reset UI if text changes
       resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
@@ -229,7 +238,9 @@ function initialize() {
       
       // Update state
       currentPatchText = patchInput.value;
-      vscode.setState({ patchText: currentPatchText });
+      if (vscode) {
+        vscode.setState({ patchText: currentPatchText });
+      }
     }
   });
   
@@ -252,19 +263,23 @@ function handlePreviewClick(
   
   // Save current patch text
   currentPatchText = patchText;
-  vscode.setState({ patchText: patchText });
+  if (vscode) {
+    vscode.setState({ patchText: patchText });
   
-  // Show loading state
-  setStatus(statusMessage, 'Parsing patch...', 'normal');
-  previewBtn.disabled = true;
-  previewBtn.setAttribute('aria-disabled', 'true');
-  
-  // Request preview from extension
-  debugLog('Sending previewPatch request');
-  vscode.postMessage({
-    command: 'previewPatch',
-    patchText
-  });
+    // Show loading state
+    setStatus(statusMessage, 'Parsing patch...', 'normal');
+    previewBtn.disabled = true;
+    previewBtn.setAttribute('aria-disabled', 'true');
+    
+    // Request preview from extension
+    debugLog('Sending previewPatch request');
+    vscode.postMessage({
+      command: 'previewPatch',
+      patchText
+    });
+  } else {
+    setStatus(statusMessage, 'VS Code API not available', 'error');
+  }
 }
 
 /**
@@ -283,11 +298,15 @@ function handleApplyClick(
   cancelBtn.setAttribute('aria-disabled', 'true');
   
   // Send patch to extension
-  debugLog('Sending applyPatch request');
-  vscode.postMessage({
-    command: 'applyPatch',
-    patchText: currentPatchText
-  });
+  if (vscode) {
+    debugLog('Sending applyPatch request');
+    vscode.postMessage({
+      command: 'applyPatch',
+      patchText: currentPatchText
+    });
+  } else {
+    setStatus(statusMessage, 'VS Code API not available', 'error');
+  }
 }
 
 /**
@@ -304,10 +323,12 @@ function handleCancelClick(
   resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
   
   // Send cancel to extension
-  debugLog('Sending cancelPatch request');
-  vscode.postMessage({
-    command: 'cancelPatch'
-  });
+  if (vscode) {
+    debugLog('Sending cancelPatch request');
+    vscode.postMessage({
+      command: 'cancelPatch'
+    });
+  }
   
   // Return focus to the textarea after cancellation
   const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
@@ -525,7 +546,9 @@ function handlePatchResults(
   if (failCount === 0) {
     patchInput.value = '';
     currentPatchText = '';
-    vscode.setState({ patchText: '' });
+    if (vscode) {
+      vscode.setState({ patchText: '' });
+    }
   }
   
   // Return focus to the textarea or preview button based on results
@@ -641,7 +664,9 @@ window.addEventListener('message', (event) => {
       if (patchInput && message.patchText && patchInput.value === '') {
         patchInput.value = message.patchText;
         currentPatchText = message.patchText;
-        vscode.setState({ patchText: currentPatchText });
+        if (vscode) {
+          vscode.setState({ patchText: currentPatchText });
+        }
         setStatus(statusMessage, 'Patch detected in clipboard and pasted. Click "Preview" to continue.', 'normal');
         debugLog('Clipboard content pasted');
       }
