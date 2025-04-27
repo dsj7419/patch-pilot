@@ -1,11 +1,9 @@
 name: CI/CD Pipeline
-
 on:
   push:
     branches: [main]
     tags:
       - 'v*' # Trigger on version tags
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,19 +14,19 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
-      
+     
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      
+     
       - name: Lint
         run: yarn lint
-      
+     
       - name: Run tests
         run: yarn test
-      
+     
       - name: Package Extension
         run: yarn vsce package
-      
+     
       - name: Upload VSIX as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -45,36 +43,60 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0  # Fetch all history and tags
+     
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
-      
+     
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      
+     
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
         with:
           name: vsix-package
-      
+     
       - name: Get VSIX filename
         id: vsix-name
         run: echo "VSIX_PATH=$(ls *.vsix)" >> $GITHUB_OUTPUT
-      
+
+      - name: Get tag message
+        id: tag-message
+        run: |
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
+          echo "TAG_MESSAGE=$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          # Try to extract publish flag from JSON in tag message
+          if [[ "$TAG_MESSAGE" == *"PUBLISH_MARKETPLACE"* ]]; then
+            PUBLISH_MARKETPLACE=$(echo $TAG_MESSAGE | grep -o '"PUBLISH_MARKETPLACE":"[^"]*"' | cut -d'"' -f4)
+            echo "PUBLISH_MARKETPLACE=$PUBLISH_MARKETPLACE" >> $GITHUB_OUTPUT
+          else
+            echo "PUBLISH_MARKETPLACE=true" >> $GITHUB_OUTPUT
+          fi
+          # Try to extract release type from JSON in tag message
+          if [[ "$TAG_MESSAGE" == *"RELEASE_TYPE"* ]]; then
+            RELEASE_TYPE=$(echo $TAG_MESSAGE | grep -o '"RELEASE_TYPE":"[^"]*"' | cut -d'"' -f4)
+            echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+          else
+            echo "RELEASE_TYPE=feature" >> $GITHUB_OUTPUT
+          fi
+     
       - name: Publish to VS Code Marketplace
+        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'true'
         run: yarn vsce publish --packagePath ${{ steps.vsix-name.outputs.VSIX_PATH }} -p "${{ secrets.VSCODE_MARKETPLACE_PAT }}"
-      
+     
       - name: Publish to Open VSX Registry
+        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'true'
         run: yarn ovsx publish ${{ steps.vsix-name.outputs.VSIX_PATH }} -p "${{ secrets.OPEN_VSX_PAT }}"
-      
+     
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.vsix-name.outputs.VSIX_PATH }}
-          name: Release ${{ github.ref_name }}
+          name: "${{ steps.tag-message.outputs.RELEASE_TYPE == 'feature' && '' || format('[{0}] ', steps.tag-message.outputs.RELEASE_TYPE) }}Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
           generate_release_notes: true

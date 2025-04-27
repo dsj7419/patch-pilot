@@ -1,0 +1,12 @@
+{
+    "mainBranch": "main",
+    "versionFiles": ["package.json"],
+    "changelogPath": "CHANGELOG.md",
+    "releasePrefix": "v",
+    "requireCleanWorkingDir": false,
+    "commitMessageTemplate": "release: {tag} - {summary}",
+    "hooks": {
+      "beforeRelease": "yarn test",
+      "afterRelease": "echo 'Release completed!'"
+    }
+  }
