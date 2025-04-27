@@ -2,7 +2,7 @@
   "name": "patch-pilot",
   "displayName": "PatchPilot",
   "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
@@ -107,6 +107,7 @@
     "dev": "yarn compile && node -e \"require('child_process').spawn('code', ['--new-window', '--extensionDevelopmentPath=' + process.cwd()], {stdio:'inherit', shell:true})\"",
     "package": "vsce package",
     "publish": "vsce publish",
+    "release": "node scripts/release.js",
     "postinstall": "node -e \"try{require('vscode/bin/install')}catch(e){}\"",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "jest",
@@ -179,7 +180,7 @@
   },
   "dependencies": {
     "diff": "^5.1.0",
-    "simple-git": "^3.19.0"
+    "simple-git": "^3.27.0"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,6 @@
 import typescriptEslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
 import jsoncParser from 'jsonc-eslint-parser';
-
 export default [
   // Base configuration - what to ignore globally
   {
@@ -12,17 +11,34 @@ export default [
       '**/*.d.ts',
       '.vscode-test/**',
       'coverage/**',
-      '*.js', 
       '*.mjs',
       'build-webview.js',
       'esbuild.js',
       'jest.config.js',
-      '**/*.md', 
-       '**/LICENSE',
-       '**/*.html'
+      'scripts/**',
+      '**/*.md',
+      '**/LICENSE',
+      '**/*.html'
     ]
   },
-
+  // Scripts JS files
+  {
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
+      parserOptions: {
+        project: null // Don't use any tsconfig for JS files
+      }
+    },
+    rules: {
+      'curly': 'warn',
+      'eqeqeq': 'warn',
+      'no-throw-literal': 'warn',
+      'semi': 'warn',
+      'no-console': 'off'
+    }
+  },
   // Source TypeScript files
   {
     files: ['src/**/*.ts', '!src/test/**/*.ts'],
@@ -38,10 +54,10 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', {
-        argsIgnorePattern: '^_',          // Ignore unused function args starting with _
-        varsIgnorePattern: '^_',          // Ignore unused variables starting with _
-        caughtErrors: 'all',              // Check unused catch parameters
-        caughtErrorsIgnorePattern: '^_',  // Ignore unused catch parameters starting with _
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrors: 'all',
+        caughtErrorsIgnorePattern: '^_',
       }],
       'curly': 'warn',
       'eqeqeq': 'warn',
@@ -50,7 +66,6 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error'] }]
     }
   },
-
   // Test TypeScript files
   {
     files: ['src/test/**/*.ts'],
@@ -59,7 +74,7 @@ export default [
       parser: tsParser,
       ecmaVersion: 2022,
       sourceType: 'module',
-      parserOptions: { 
+      parserOptions: {
         project: './tsconfig.test.json'
       }
     },
@@ -69,7 +84,6 @@ export default [
       'no-console': 'off'
     }
   },
-
   // JSON files
   {
     files: ['**/*.json', '**/*.jsonc', 'tsconfig*.json'],
@@ -80,7 +94,6 @@ export default [
       }
     }
   },
-
   // Webview TypeScript
   {
     files: ['webview/**/*.ts'],
