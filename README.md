@@ -210,6 +210,14 @@ Pull requests welcome!
 
 ---
 
+## Community and Support
+
+- [Issue Tracker](https://github.com/dsj7419/patch-pilot/issues): Report bugs or request features
+- [Discussions](https://github.com/dsj7419/patch-pilot/discussions): Ask questions and share ideas
+- [Contributing Guidelines](CONTRIBUTING.md): Learn how to contribute to PatchPilot
+
+---
+
 ## 🛠️ Developer Quick Start
 
 ```bash

@@ -1,0 +1,15 @@
+# Default owners for everything
+
+* @dsj7419
+
+## Extension core
+
+src/core/ @dsj7419
+
+## Tests
+
+src/test/ @dsj7419
+
+## Documentation
+
+*.md @dsj7419

@@ -1,10 +1,25 @@
+# Changelog
 
-# Change Log
-
-All notable changes to the "PatchPilot" extension will be documented in this file.
+All notable changes to the PatchPilot extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.4] - 2025-04-26
+
+### Fixed
+
+- Fixed linting error with empty try catch
+- Improved CI/CD pipeline for GitHub releases
+
+## [1.0.3] - 2025-04-26
+
+### Added
+
+- Initial public release
+- Support for fuzzy matching of patches
+- Multi-file diff handling
+- Git integration
 
 [0.3.0] - 2025-04-26
 Added
