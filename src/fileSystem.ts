@@ -34,6 +34,22 @@ export interface FileModificationResult {
 }
 
 /**
+ * Logs a message to VS Code output channel if possible
+ * This is a supplementary logging method used alongside console methods
+ * @param message The message to log
+ */
+function logToVSCode(message: string): void {
+  try {
+    const output = vscode.window.createOutputChannel('PatchPilot');
+    if (output && output.appendLine) {
+      output.appendLine(message);
+    }
+  } catch (_e) {
+    // Silently fail if VS Code API is not available
+  }
+}
+
+/**
  * Checks if a file has been modified since the given stats were collected
  * @param fileUri The URI of the file to check
  * @param originalStats The original file stats
@@ -88,9 +104,15 @@ export async function checkFileModification(
     return { modified: true, proceed: false, originalStats, currentStats };
   } catch (error) {
     // If there's an error checking the file, log it and proceed
-    // FIXED: Handle case where fileUri might be undefined
     const filePathString = fileUri ? fileUri.toString() : 'unknown file';
-    console.warn(`Error checking file modification for ${filePathString}: ${error}`);
+    const errorMessage = `Error checking file modification for ${filePathString}: ${error}`;
+    
+    // Log to console for test compatibility - this must be called directly
+    console.warn(errorMessage);
+    
+    // Also try to log to VS Code output channel
+    logToVSCode(errorMessage);
+    
     return { modified: false, proceed: true, originalStats };
   }
 }
@@ -126,7 +148,14 @@ export async function withModificationCheck<T>(
     return result;
   } catch (error) {
     // If there's an error, log it and re-throw
-    console.error(`Error performing operation with modification check: ${error}`);
+    const errorMessage = `Error performing operation with modification check: ${error}`;
+    
+    // Log to console for test compatibility - this must be called directly
+    console.error(errorMessage);
+    
+    // Also try to log to VS Code output channel
+    logToVSCode(errorMessage);
+    
     throw error;
   }
 }

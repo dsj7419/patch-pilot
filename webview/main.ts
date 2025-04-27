@@ -15,14 +15,6 @@ interface VSCodeAPI {
 // Define the VS Code API function
 declare function acquireVsCodeApi(): VSCodeAPI;
 
-// Define interface for window extensions
-interface CustomWindow extends Window {
-  showDiagnostics: () => void;
-}
-
-// Type assertion for window
-const customWindow = window as unknown as CustomWindow;
-
 // File information interface
 interface FileInfo {
   filePath: string;
@@ -67,57 +59,13 @@ interface ExtensionMessage {
   data?: unknown;
 }
 
-// Monitor CSP violations
-document.addEventListener('securitypolicyviolation', (e) => {
-  debugLog(`CSP violation: ${e.violatedDirective}, ${e.effectiveDirective}, ${e.blockedURI}`);
-});
-
-// Create a diagnostics div to show errors
-const createDiagnosticsDom = () => {
-  if (!document.getElementById('diagnostics-panel')) {
-    const diag = document.createElement('div');
-    diag.id = 'diagnostics-panel';
-    diag.className = 'debug-panel';
-    diag.style.display = 'none';
-    document.body.insertBefore(diag, document.body.firstChild);
-  }
-};
-
-// Helper function to log to diagnostics panel
-const logToDiagnostics = (message: string) => {
-  const diag = document.getElementById('diagnostics-panel');
-  if (diag) {
-    diag.style.display = 'block';
-    const entry = document.createElement('div');
-    entry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-    diag.appendChild(entry);
-  }
-};
-
-document.addEventListener('DOMContentLoaded', createDiagnosticsDom);
-
 // Get the VS Code API
 let vscode: VSCodeAPI | undefined;
 try {
   vscode = acquireVsCodeApi();
-  window.addEventListener('load', () => {
-    document.dispatchEvent(new CustomEvent('debug-log', { 
-      detail: 'VS Code API acquired successfully' 
-    }));
-  });
 } catch (error) {
-  window.addEventListener('load', () => {
-    logToDiagnostics(`VS Code API Error: ${error instanceof Error ? error.message : String(error)}`);
-  });
+  // API not available - could happen in tests
 }
-
-// Make diagnostics available to the browser console for manual testing
-customWindow.showDiagnostics = () => {
-  const diag = document.getElementById('diagnostics-panel');
-  if (diag) {
-    diag.style.display = 'block';
-  }
-};
 
 // Global state
 let currentPatchText = '';
@@ -126,29 +74,10 @@ let _currentSettings: ExtensionSettings = {
   fuzzFactor: 2
 };
 
-// Debug helper
-function debugLog(message: string): void {
-  const debugPanel = document.getElementById('debug-panel');
-  const debugStatus = document.getElementById('debug-status');
-  
-  if (debugPanel && debugStatus) {
-    debugPanel.classList.remove('hidden');
-    debugPanel.classList.add('visible');
-    
-    const timestamp = new Date().toLocaleTimeString();
-    debugStatus.textContent = `${timestamp}: ${message}`;
-    
-    // Also log to diagnostics
-    logToDiagnostics(message);
-  }
-}
-
 /**
  * Main initialization function
  */
 function initialize() {
-  debugLog('Initializing webview client...');
-  
   // Get DOM elements with proper type casting
   const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
   const previewArea = document.getElementById('preview-area') as HTMLDivElement;
@@ -160,11 +89,8 @@ function initialize() {
 
   // Validate DOM elements are found
   if (!patchInput || !previewArea || !fileList || !previewBtn || !applyBtn || !cancelBtn || !statusMessage) {
-    debugLog('ERROR: Failed to find required DOM elements');
     return;
   }
-
-  debugLog('DOM elements loaded successfully');
 
   // Restore any cached state from VS Code API
   if (vscode) {
@@ -188,17 +114,14 @@ function initialize() {
   
   // Setup event listeners
   previewBtn.addEventListener('click', () => {
-    debugLog('Preview button clicked');
     handlePreviewClick(patchInput, previewBtn, statusMessage);
   });
   
   applyBtn.addEventListener('click', () => {
-    debugLog('Apply button clicked');
     handleApplyClick(applyBtn, cancelBtn, statusMessage);
   });
   
   cancelBtn.addEventListener('click', () => {
-    debugLog('Cancel button clicked');
     handleCancelClick(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
   });
   
@@ -243,8 +166,6 @@ function initialize() {
       }
     }
   });
-  
-  debugLog('Event listeners registered');
 }
 
 /**
@@ -272,7 +193,6 @@ function handlePreviewClick(
     previewBtn.setAttribute('aria-disabled', 'true');
     
     // Request preview from extension
-    debugLog('Sending previewPatch request');
     vscode.postMessage({
       command: 'previewPatch',
       patchText
@@ -299,7 +219,6 @@ function handleApplyClick(
   
   // Send patch to extension
   if (vscode) {
-    debugLog('Sending applyPatch request');
     vscode.postMessage({
       command: 'applyPatch',
       patchText: currentPatchText
@@ -324,7 +243,6 @@ function handleCancelClick(
   
   // Send cancel to extension
   if (vscode) {
-    debugLog('Sending cancelPatch request');
     vscode.postMessage({
       command: 'cancelPatch'
     });
@@ -347,11 +265,6 @@ function handlePatchPreview(
   cancelBtn: HTMLButtonElement,
   statusMessage: HTMLDivElement
 ): void {
-  /* ───────── incoming data ───────── */
-  debugLog(
-    `[handlePatchPreview] start – fileInfo: ${JSON.stringify(fileInfo)}`
-  );
-
   if (!fileInfo || fileInfo.length === 0) {
     setStatus(statusMessage, 'No valid patches found in the provided text.', 'error');
     previewBtn.disabled = false;
@@ -359,7 +272,6 @@ function handlePatchPreview(
     return;
   }
 
-  /* ─────── build the file list UI ─────── */
   fileList.innerHTML = '';
 
   let totalAdditions = 0;
@@ -372,7 +284,6 @@ function handlePatchPreview(
     totalAdditions += file.changes.additions;
     totalDeletions += file.changes.deletions;
 
-    /* … (unchanged DOM creation for each file) … */
     const entry = document.createElement('div');
     entry.className = 'file-entry';
     entry.setAttribute('role', 'listitem');
@@ -393,13 +304,13 @@ function handlePatchPreview(
     fileList.appendChild(entry);
   });
 
-  /* add summary row (unchanged) */
+  // Add summary row
   const summary = document.createElement('div');
   summary.className = 'file-entry summary-entry';
   summary.textContent = `📊 Total: ${fileInfo.length} files (${missingFiles} missing)  (+${totalAdditions} -${totalDeletions})`;
   fileList.appendChild(summary);
 
-  /* ─────── final enable / disable logic ─────── */
+  // Enable/disable apply button
   const applyShouldBeEnabled = fileInfo.some(f => f.exists); // at least one file can be patched
   applyBtn.disabled = !applyShouldBeEnabled;
   applyBtn.setAttribute('aria-disabled', applyShouldBeEnabled ? 'false' : 'true');
@@ -426,8 +337,6 @@ function handlePatchPreview(
       'success');
     applyBtn.focus();
   }
-
-  debugLog(`[handlePatchPreview] applyShouldBeEnabled=${applyShouldBeEnabled} → applyBtn.disabled=${applyBtn.disabled}`);
 }
 
 
@@ -443,8 +352,6 @@ function handlePatchResults(
   previewBtn: HTMLButtonElement,
   statusMessage: HTMLDivElement
 ): void {
-  debugLog(`Received patch results for ${results?.length || 0} files`);
-  
   if (!results || results.length === 0) {
     setStatus(statusMessage, 'No results returned from patch operation.', 'error');
     resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
@@ -479,7 +386,7 @@ function handlePatchResults(
     setStatus(statusMessage, `Applied ${successCount} patch(es), ${failCount} failed. Check output for details.`, 'warning');
   }
   
-  // Reset UI - use classList instead of style
+  // Reset UI
   previewArea.classList.add('hidden');
   previewArea.classList.remove('visible');
   
@@ -515,7 +422,6 @@ function handlePatchError(
   previewBtn: HTMLButtonElement,
   statusMessage: HTMLDivElement
 ): void {
-  debugLog(`Received error: ${error}`);
   setStatus(statusMessage, `Error: ${error}`, 'error');
   previewBtn.disabled = false;
   previewBtn.setAttribute('aria-disabled', 'false');
@@ -543,8 +449,6 @@ function setStatus(
   } else if (type === 'error') {
     statusElement.classList.add('error-icon');
   }
-  
-  debugLog(`Status updated: ${message} (${type})`);
 }
 
 /**
@@ -557,7 +461,6 @@ function resetUI(
   cancelBtn: HTMLButtonElement,
   statusMessage: HTMLDivElement
 ): void {
-  // Use classList instead of style
   previewArea.classList.add('hidden');
   previewArea.classList.remove('visible');
   
@@ -568,14 +471,11 @@ function resetUI(
   cancelBtn.disabled = true;
   cancelBtn.setAttribute('aria-disabled', 'true');
   setStatus(statusMessage, 'Ready to parse your unified diff.', 'normal');
-  debugLog('UI reset to initial state');
 }
 
 // Handle message events from the extension
 window.addEventListener('message', (event) => {
   const message = event.data as ExtensionMessage;
-  
-  debugLog(`Received message from extension: ${message.command}`);
   
   // Get DOM elements
   const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
@@ -605,7 +505,6 @@ window.addEventListener('message', (event) => {
     case 'updateSettings':
       if (message.config) {
         _currentSettings = message.config;
-        debugLog(`Settings updated: ${JSON.stringify(_currentSettings)}`);
       }
       break;
     case 'clipboardContent':
@@ -616,16 +515,12 @@ window.addEventListener('message', (event) => {
           vscode.setState({ patchText: currentPatchText });
         }
         setStatus(statusMessage, 'Patch detected in clipboard and pasted. Click "Preview" to continue.', 'normal');
-        debugLog('Clipboard content pasted');
       }
       break;
-    default:
-      debugLog(`Unknown message command: ${message.command}`);
   }
 });
 
 // Run initialization when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  debugLog('DOM content loaded');
   initialize();
 });

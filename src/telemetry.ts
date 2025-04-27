@@ -30,7 +30,7 @@ export async function initTelemetry(context: vscode.ExtensionContext): Promise<v
   const config = vscode.workspace.getConfiguration('patchPilot');
   telemetryEnabled = config.get<boolean>('enableTelemetry', false);
 
-  // Ensure events buffer exists - this is the missing line causing the first test failure
+  // Ensure events buffer exists
   await ctx.globalState.update('telemetryEvents', []);
 
   // Generate or retrieve anonymousUserId
@@ -62,7 +62,7 @@ export async function initTelemetry(context: vscode.ExtensionContext): Promise<v
     })
   );
 
-  // Schedule telemetry submission - this is missing and causing the second test failure
+  // Schedule telemetry submission
   setTimeout(() => submitTelemetry(), 60000);
 }
 

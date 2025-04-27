@@ -63,7 +63,8 @@ export async function applyPatch(
           fileStats = await vscode.workspace.fs.stat(fileUri);
         } catch (_err) {
           // If stat fails, continue anyway but without mtime check
-          console.warn(`Could not get file stats for ${relPath}, skipping mtime check`);
+          const output = vscode.window.createOutputChannel('PatchPilot');
+          output.appendLine(`Could not get file stats for ${relPath}, skipping mtime check`);
         }
       }
 
@@ -127,7 +128,8 @@ export async function applyPatch(
           }
         } catch (_err) {
           // If stat fails at this point, continue but log warning
-          console.warn(`Could not verify file stats for ${relPath}`);
+          const output = vscode.window.createOutputChannel('PatchPilot');
+          output.appendLine(`Could not verify file stats for ${relPath}`);
         }
       }
 
@@ -348,15 +350,6 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
   
   const normalized = normalizeDiff(cleanPatchText);
   const patches = DiffLib.parsePatch(normalized) as DiffParsedPatch[];
-
-  // eslint-disable-next-line no-console
-  console.log("Normalized diff:", normalizeDiff);
-  patches.forEach((p, i) => {
-    // eslint-disable-next-line no-console
-    console.log(`Patch ${i} oldFileName:`, p.oldFileName);
-    // eslint-disable-next-line no-console
-    console.log(`Patch ${i} newFileName:`, p.newFileName);
-  });
 
   const info: FileInfo[] = [];
 

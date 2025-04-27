@@ -110,30 +110,6 @@ p {
   display: flex !important;
 }
 
-/* Debug panel styles */
-.debug-panel {
-  margin: 10px 0;
-  padding: 8px;
-  font-family: var(--vscode-editor-font-family, 'monospace');
-  font-size: 12px;
-  background-color: var(--vscode-editorHint-background, rgba(102, 175, 224, 0.12));
-  border: 1px solid var(--vscode-editorHint-foreground, #6c9ef8);
-  border-radius: 4px;
-}
-
-/* Diagnostic panel styles - used only for development */
-#diagnostics-panel {
-  margin: 10px 0;
-  padding: 8px;
-  font-family: var(--vscode-editor-font-family, 'monospace');
-  font-size: 12px;
-  background-color: rgba(255, 99, 71, 0.1);
-  border: 1px solid rgba(255, 99, 71, 0.5);
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
 .preview-container {
   margin-bottom: 20px;
   padding: 10px;

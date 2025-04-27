@@ -1,231 +1,255 @@
-# PatchPilot
+# PatchPilot 🚀
 
-## **Paste Fuzzy Unified Diffs & Apply with AI-Grade Smarts**
+## **AI-Powered Unified Diff Application with Fuzzy Matching** ✨
 
 [![Version](https://img.shields.io/visual-studio-marketplace/v/patchpilot.patch-pilot)](https://marketplace.visualstudio.com/items?itemName=patchpilot.patch-pilot)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/patchpilot.patch-pilot)](https://marketplace.visualstudio.com/items?itemName=patchpilot.patch-pilot)
 [![Ratings](https://img.shields.io/visual-studio-marketplace/r/patchpilot.patch-pilot)](https://marketplace.visualstudio.com/items?itemName=patchpilot.patch-pilot)
 [![License](https://img.shields.io/github/license/dsj7419/patch-pilot)](LICENSE)
-</div>
 
-## Overview
-
-PatchPilot is a VS Code extension that lets AI assistants (or humans) paste imperfect unified diffs and have them applied safely to your code, with intelligent fuzzy matching to handle common formatting issues.
+---
 
 ![PatchPilot Demo](media/demo.gif)
 
-## Features
+---
 
-- **AI-Friendly Patch Application**: Intelligently handles diffs from AI systems like Claude and ChatGPT, which often have minor formatting issues
-- **Multi-File Support**: Apply changes across multiple files in a single operation
-- **Interactive Preview**: See what will change before committing
-- **Three-Tier Fuzzy Matching**: Smart algorithm adapts to slight context differences:
-  1. **Strict Mode**: First tries exact matching
-  2. **Shifted Mode**: Then tries to find the patch with shifted line numbers
-  3. **Greedy Mode**: Finally tries matching by ignoring problematic context lines
-- **Git Integration**: Auto-stage changes to Git after applying a patch
-- **Completely Offline**: No network calls, works anywhere
+## 🚀 Why PatchPilot?
 
-## Common AI Assistant Diff Issues PatchPilot Fixes
+- **Maximize AI Context Windows**
+- **Confidently Apply AI-Generated Code**
+- **Preview Before You Commit**
+- **Seamless Git Workflow**
+- **Offline & Secure by Design**
 
-- Missing leading spaces on context lines
-- Mixed CRLF/LF line endings
-- Missing diff headers
-- Slight context drift when files have been edited
+---
 
-## Installation
+## 🔧 Installation
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "PatchPilot"
-4. Click Install
+> **VS Code Extension Marketplace**
 
-## Usage
+1. Open **VS Code**.
+2. Open **Extensions** (`Ctrl+Shift+X`).
+3. Search **PatchPilot**.
+4. Click **Install**.
 
-### Basic Usage
+---
 
-1. Copy a unified diff from your AI assistant or other source
-2. Run the command "PatchPilot: Paste Diff" from the Command Palette (Ctrl+Shift+P) or use the keyboard shortcut `Ctrl+Alt+P` (`Cmd+Alt+P` on macOS)
-3. Paste the diff into the input panel
-4. Click "Preview" to see what will change
-5. Click "Apply Patch" to apply the changes
+## 💡 How to Use PatchPilot
 
-### Keyboard Shortcuts
+### Via Command Palette
 
-- Launch PatchPilot: `Ctrl+Alt+P` (`Cmd+Alt+P` on macOS)
-- In the diff input panel, press `Ctrl+Enter` (or `Cmd+Enter` on macOS) to preview the patch
+- Copy a unified diff.
+- `Ctrl+Shift+P` → **`PatchPilot: Paste Diff`** → Preview → Apply.
 
-### Applying Selected Diff
+- Create a git branch
+- `Ctrl+Shift+P` → **`PatchPilot: Branch for Patch`** → Preview → Apply.
 
-You can also select a diff in any editor and apply it directly:
+### Via Context Menu
 
-1. Select the diff text in your editor
-2. Right-click and choose "PatchPilot: Apply Selected Diff" from the context menu
-3. Preview and apply the patch
+- Select diff text.
+- Right-click → **`PatchPilot: Apply Selected Diff`** → Preview → Apply.
 
-### Git Integration
+---
 
-Enable automatic staging of patched files by setting `patchPilot.autoStage` to `true` in your VS Code settings.
+## 🧠 Ultimate AI Assistant Prompt for PatchPilot
 
-You can also create a temporary branch for your patch using the command "PatchPilot: Create Branch for Patch".
+> To optimize your workflow with AI assistants (like Claude, ChatGPT, Gemini) and PatchPilot, provide the following instructions to your AI at the beginning of your coding session. This ensures the AI focuses on generating efficient diffs that PatchPilot can readily apply, saving context window tokens and streamlining your development process.
 
-## Extension Settings
+```plaintext
+      
+--- PatchPilot AI Code Generation Instructions ---
 
-PatchPilot contributes the following settings:
+**CONTEXT:** I am using a VS Code extension called PatchPilot. Your primary task when I request code changes is to provide ONLY the modifications in the standard **unified diff format**. Do NOT output the complete modified file(s).
 
-- `patchPilot.autoStage`: Enable/disable automatic staging of changed files to Git (default: `false`)
-- `patchPilot.fuzzFactor`: Set the fuzz factor for context matching (0-3, higher values allow more flexible matching, default: `2`)
-- `patchPilot.enableTelemetry`: Enable/disable anonymous telemetry to help improve PatchPilot (default: `false`)
+**CORE RULES FOR ALL CODE RESPONSES:**
 
-## For AI Assistants: Programmatic API
+1.  **OUTPUT FORMAT:** MUST be **unified diff**.
+    *   Example:
+        ```diff
+        diff --git a/path/to/file.ext b/path/to/file.ext
+        --- a/path/to/file.ext
+        +++ b/path/to/file.ext
+        @@ -old_start,old_lines +new_start,new_lines @@
+         context line (unchanged)
+        -line to remove
+        +line to add
+         another context line
+        ```
 
-PatchPilot provides a command API that can be used programmatically by AI assistants or other extensions:
+2.  **FILE PATHS:** MUST use correct **relative paths** from the project root in all header lines (`diff --git`, `---`, `+++`).
+    *   Example: `src/components/Button.tsx`, NOT `Button.tsx` or `/abs/path/to/Button.tsx`.
+
+3.  **CONTEXT LINES:** MUST include **at least 3 lines** of unchanged context before and after each changed block within a hunk (`@@ ... @@`). Lines starting with a space are context lines.
+
+4.  **MULTI-FILE CHANGES:** MUST be combined into a **single diff output block**. Each file's changes must be separated by the standard `diff --git ...` header sequence for that file.
+
+5.  **NEW FILES:** MUST use `/dev/null` as the source file in headers.
+    *   Example:
+        ```diff
+        diff --git a/dev/null b/path/to/new_file.ext
+        --- /dev/null
+        +++ b/path/to/new_file.ext
+        @@ -0,0 +1,5 @@
+        +new line 1
+        +new line 2
+        +new line 3
+        +new line 4
+        +new line 5
+        ```
+
+6.  **IGNORE MINOR FORMATTING:** You do **not** need to worry about:
+    *   Line Endings: PatchPilot normalizes LF/CRLF automatically.
+    *   Leading Spaces: PatchPilot adds missing leading spaces on context lines automatically.
+    *   Focus on generating the *correct code change logic* within the diff structure.
+
+**PERSISTENCE:** Please adhere to these rules **consistently** for all subsequent code modification requests in this session without needing further reminders. Respond ONLY with the diff block unless I specifically ask for something else.
+
+    
+```
+
+✅ This ensures every AI response seamlessly integrates with PatchPilot.
+
+---
+
+## ✨ Key Features
+
+### ⚙️ Smart Patch Application
+
+- Fixes missing spaces in context.
+- Handles CRLF/LF line endings automatically.
+- Adds missing diff headers when needed.
+- Cleans file paths with hidden characters.
+
+### 🧩 Fuzzy Matching (Three-Tier Strategy)
+
+- **Strict Mode** → Exact match.
+- **Shifted Mode** → Finds nearby lines.
+- **Greedy Mode** → Match based on added/removed lines.
+
+### 📂 Multi-File Diff Support
+
+### 🔗 Git Integration
+
+- Auto-stage patches.
+- Create temporary branches instantly. Can use randomized name or custom one.
+
+---
+
+## ⚙️ Settings Overview
+
+| Setting | Type | Default | Description |
+|:--------|:-----|:--------|:------------|
+| `patchPilot.autoStage` | boolean | `false` | Auto-stage patched files |
+| `patchPilot.fuzzFactor` | enum (0-3) | `2` | Controls fuzzy matching aggression |
+| `patchPilot.mtimeCheck` | boolean | `true` | Check file modification times |
+| `patchPilot.enableTelemetry` | boolean | `false` | Send minimal anonymous telemetry |
+
+### ⌨️ Keyboard Shortcuts
+
+- Launch PatchPilot: `Ctrl+Alt+P` / `Cmd+Alt+P`
+- Preview Patch: `Ctrl+Enter` / `Cmd+Enter`
+
+---
+
+## 🔌 PatchPilot API for Extensions
 
 ```javascript
-// Apply a patch
-const results = await vscode.commands.executeCommand('patchPilot.applyPatch', patchText, {
-  preview: true,     // Show preview before applying (default: true)
-  autoStage: false,  // Auto-stage changes to Git (default: from settings)
-  fuzz: 2            // Fuzz factor for context matching (default: from settings)
-});
+// Apply a patch (with optional options)
+const results = await vscode.commands.executeCommand('patchPilot.applyPatch', patchText, { preview: true });
 
 // Parse a patch without applying
 const fileInfo = await vscode.commands.executeCommand('patchPilot.parsePatch', patchText);
 
-// Create a branch for the patch
-const branchName = await vscode.commands.executeCommand('patchPilot.createBranch', 'custom-branch-name');
+// Create a Git branch
+const branchName = await vscode.commands.executeCommand('patchPilot.createBranch', 'optional-name');
 ```
 
-## Example: Patch Application Strategy
+---
 
-PatchPilot uses a sophisticated three-tier strategy for applying patches:
+## 🔍 Troubleshooting
 
-1. **First attempt**: Direct application with `diff.applyPatch()` for exact matches
-2. **Second attempt**: If that fails, try to shift the hunk headers to match surrounding context
-3. **Final attempt**: If shifting fails, try dropping problematic context lines using "greedy mode"
+### Patch Failed to Apply?
 
-This approach ensures maximum compatibility with AI-generated patches while maintaining safety.
+- View the **PatchPilot Output** panel.
+- Increase `patchPilot.fuzzFactor`.
+- Ensure the file exists and matches.
 
-## Example: Fixing Common AI Patch Issues
-
-Here's a real-world example of how PatchPilot fixes common issues in AI-generated patches:
-
-**Original (broken) patch from AI:**
-
-```diff
-@@ -10,7 +10,7 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import './index.css';
--import App from './App';
-+import { App } from './App';
-import reportWebVitals from './reportWebVitals';
-```
-
-**Issues:**
-
-- Missing diff headers
-- Missing leading spaces on some context lines (the `import React` line)
-
-PatchPilot automatically:
-
-1. Adds the missing headers
-2. Adds leading spaces to context lines
-3. Finds the right location in your file even if line numbers have shifted
-
-## Troubleshooting
-
-### Patch Doesn't Apply
-
-If a patch fails to apply, try:
-
-1. Increasing the fuzz factor in settings (up to 3)
-2. Ensuring the target files exist in your workspace
-3. Checking if the patch is valid unified diff format
-
-### Debugging
-
-For more detailed error information, check the PatchPilot output channel in VS Code's Output panel.
-
-## FAQ
-
-**Q: Can PatchPilot handle patches for files that don't exist yet?**
-
-A: No, PatchPilot requires the target files to exist in your workspace.
-
-**Q: Does it work with binary files?**
-
-A: No, PatchPilot only works with text files.
-
-**Q: Can I use it with non-Git projects?**
-
-A: Yes! The Git integration is optional. The core patch functionality works with any files.
-
-**Q: How does the fuzzy matching work?**
-
-A: PatchPilot uses a three-tier strategy:
-
-1. First tries exact matching
-2. Then tries to locate the right position by matching context lines within a window
-3. Finally tries a "greedy" approach by ignoring problematic context lines
-
-**Q: Is PatchPilot secure?**
-
-A: Yes, PatchPilot operates completely offline without any network calls. It only modifies files after explicit user confirmation.
-
-## Performance Considerations
-
-- The extension is optimized for typical patch sizes (up to thousands of lines).
-- For very large patches (10,000+ lines), the preview might take a moment to generate.
-- Using a lower fuzz factor (0 or 1) can improve performance if you're dealing with exact matches.
-
-## Privacy and Telemetry
-
-PatchPilot collects anonymous usage data by default to help improve the extension. This can be disabled by setting `patchPilot.enableTelemetry` to `false`.
-
-The data collected includes:
-
-- Extension activation and basic VS Code info
-- Patch statistics (number of files, success/failure rates)
-- Which strategies were successful for applying patches
-
-No file content, diff content, or personal information is ever collected.
-
-## License
-
-This extension is licensed under the [MIT License](LICENSE).
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
+### Git "Dubious Ownership" Issue?
 
 ```bash
-# Clone the repository
-git clone https://github.com/dsj7419/patch-pilot.git
-cd patch-pilot
-
-# Install dependencies
-yarn install
-
-# Compile
-yarn compile
-
-# Watch for changes during development
-yarn watch
-
-# Run tests
-yarn test
+git config --global --add safe.directory /your/project/path
 ```
 
-## Acknowledgements
+### Patch Fails or Filename Incorrect?
 
-- This extension uses the excellent [diff](https://github.com/kpdecker/jsdiff) package for patch parsing and application
-- Icon and design elements created with assistance from AI tools
+- Ensure the unified diff headers (`diff --git`, `---`, `+++`) use LF (`
+`) endings.
+- PatchPilot normalizes content line endings automatically, but header CRLFs can occasionally impact file matching.
+
+---
+
+## 🔒 Privacy First
+
+- Minimal telemetry by default.
+- No file contents or sensitive info collected.
+- Full opt-out via settings.
+
+---
+
+## 📜 License
+
+MIT License.
+
+---
+
+## 🤝 Contributing
+
+Pull requests welcome!
+
+[View PatchPilot on GitHub 🔗](https://github.com/dsj7419/patch-pilot)
+
+---
+
+## 🛠️ Developer Quick Start
+
+```bash
+git clone https://github.com/dsj7419/patch-pilot.git
+cd patch-pilot
+yarn install
+yarn compile
+# Press F5 in VS Code to run Extension Development Host
+```
+
+---
+
+## ⚡ Performance Benchmarks
+
+PatchPilot includes optimized strategies that significantly speed up processing for larger or more complex patches compared to standard approaches:
+
+| Strategy | Avg Speedup |
+|:---------|------------:|
+| Greedy   | 43.84× faster |
+| Shifted  | 1.27× faster |
+| Strict   | 0.99× comparable |
+| Chained  | 0.76× comparable |
+| **Overall** | **10.77× faster** |
+
+Benchmarks reflect average speedup using PatchPilot's adaptive strategy selection.
+
+### 🚀 Large File Handling
+
+- **100KB files**: 3.22× faster
+- **1MB files**: 18.31× faster
+- **2MB files (960+ hunks)**: 53ms vs 6095ms
+
+---
+
+## 🙏 Acknowledgements
+
+- Built on top of `diff`.
+- Powered by `simple-git` for Git operations.
+- Inspired by everyday AI development challenges.
+
+---
+
+**Thanks for using PatchPilot! ✈️ Happy coding!**
