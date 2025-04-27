@@ -2,7 +2,7 @@
   "name": "patch-pilot",
   "displayName": "PatchPilot",
   "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
