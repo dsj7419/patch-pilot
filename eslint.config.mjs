@@ -18,6 +18,7 @@ export default [
       'scripts/**',
       '**/*.md',
       '**/LICENSE',
+      '.github/CODEOWNERS',
       '**/*.html'
     ]
   },
