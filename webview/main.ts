@@ -63,7 +63,8 @@ interface ExtensionMessage {
 let vscode: VSCodeAPI | undefined;
 try {
   vscode = acquireVsCodeApi();
-} catch (error) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+} catch (_error) {
   // API not available - could happen in tests
 }
 

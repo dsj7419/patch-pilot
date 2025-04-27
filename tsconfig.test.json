@@ -1,4 +1,3 @@
-/* eslint-disable */
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
@@ -12,17 +11,14 @@
       "resolveJsonModule": true,
       "forceConsistentCasingInFileNames": true,
       "skipLibCheck": true,
-      "noImplicitAny": false,
-      "rootDir": ".",
-      "isolatedModules": true
+      "noImplicitAny": false
     },
     "include": [
-      "src/**/*.ts"
+      "src/**/*.ts",
+      "src/test/**/*.ts"
     ],
     "exclude": [
       "node_modules",
-      ".vscode-test",
-      "out",
-      "dist"
+      ".vscode-test"
     ]
   }

@@ -73,7 +73,7 @@ jobs:
     - name: Publish to VS Code Marketplace
       env:
         VSCODE_MARKETPLACE_PAT: ${{ secrets.VSCODE_MARKETPLACE_PAT }}
-      run: yarn vsce publish -p "$VSCODE_MARKETPLACE_PAT" *.vsix # Specify the vsix file
+      run: yarn vsce publish -p "$VSCODE_MARKETPLACE_PAT" *.vsix
 
     - name: Publish to Open VSX Registry
       env:
