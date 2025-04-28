@@ -1,131 +1,162 @@
-name: CI/CD Pipeline
+# .github/workflows/ci.yml
+name: CI / CD Pipeline
 
+###############################################################################
+#  🔔 Triggers
+###############################################################################
 on:
   push:
-    branches: 
-      - 'main'
-      - 'release-*'
+    branches:
+      - main
+      - release-*
     tags:
-      - 'v*'
+      - 'v*'       # v1.2.3 etc. — created by scripts/release.js
   pull_request:
     branches: [ main ]
 
+###############################################################################
+#  🧪 Build & Test (always)
+###############################################################################
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+      - name: 🛎️ Checkout
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
-     
-      - name: Install dependencies
+
+      - name: 📦 Install deps
         run: yarn install --frozen-lockfile
-     
-      - name: Lint
+
+      - name: 🔍 Lint
         run: yarn lint
-     
-      - name: Run tests
+
+      - name: 🧪 Tests
         run: yarn test
-     
-      - name: Package Extension
-        run: yarn vsce package
-     
-      - name: Upload VSIX as artifact
+
+      # Build a .vsix only when this run was triggered by a tag
+      - name: 📦 Package extension
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: yarn vsce package --no-dependencies
+
+      - name: ⬆️ Upload VSIX
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: vsix-package
           path: "*.vsix"
           retention-days: 5
 
+  ###############################################################################
+  #  🚀 Publish & GitHub Release  ── runs only when the event ref is  refs/tags/v*
+  ###############################################################################
   publish:
     needs: build
-    if: success() && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest          # Marketplace/OvSX CLIs require Linux
     permissions:
-      contents: write
-   
+      contents: write               # allow upload of GitHub Release asset
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-     
-      - name: Setup Node.js
+      # ────────── fail fast if PAT secrets are missing ──────────
+      - name: 🛑 Verify Marketplace secrets
+        shell: bash
+        env:
+          VSCODE_MARKETPLACE_PAT: ${{ secrets.VSCODE_MARKETPLACE_PAT }}
+          OPEN_VSX_PAT:           ${{ secrets.OPEN_VSX_PAT }}
+        run: |
+          if [[ -z "$VSCODE_MARKETPLACE_PAT" || -z "$OPEN_VSX_PAT" ]]; then
+            echo "❌ VS Code Marketplace or Open VSX PAT secret is missing."
+            exit 1
+          fi
+          echo "✅ All publish secrets present."
+
+      # ────────── checkout & toolchain ──────────
+      - name: 🛎️ Checkout (full history)
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: 🏗️ Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'yarn'
-     
-      - name: Install dependencies
+
+      - name: 📦 Install deps
         run: yarn install --frozen-lockfile
-     
-      - name: Download VSIX artifact
+
+      # ────────── get the VSIX built in the build job ──────────
+      - name: ⬇️ Download VSIX artifact
         uses: actions/download-artifact@v4
-        with:
-          name: vsix-package
-     
-      - name: Get VSIX filename
-        id: vsix-name
-        run: echo "VSIX_PATH=$(ls *.vsix)" >> $GITHUB_OUTPUT
+        with: { name: vsix-package }
 
-      - name: Get tag message
-        id: tag-message
+      - name: 🔎 Locate VSIX
+        id: vsix
+        shell: bash
         run: |
-          TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
-          echo "TAG_MESSAGE=$TAG_MESSAGE" >> $GITHUB_OUTPUT
-          
-          # Try to extract publish flag from JSON in tag message
-          if [[ "$TAG_MESSAGE" == *"PUBLISH_MARKETPLACE"* ]]; then
-            PUBLISH_MARKETPLACE=$(echo $TAG_MESSAGE | grep -o '"PUBLISH_MARKETPLACE":"[^"]*"' | cut -d'"' -f4)
-            echo "PUBLISH_MARKETPLACE=$PUBLISH_MARKETPLACE" >> $GITHUB_OUTPUT
-          else
-            echo "PUBLISH_MARKETPLACE=true" >> $GITHUB_OUTPUT
-          fi
-          
-          # Try to extract release type from JSON in tag message
-          if [[ "$TAG_MESSAGE" == *"RELEASE_TYPE"* ]]; then
-            RELEASE_TYPE=$(echo $TAG_MESSAGE | grep -o '"RELEASE_TYPE":"[^"]*"' | cut -d'"' -f4)
-            echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_OUTPUT
-          else
-            echo "RELEASE_TYPE=feature" >> $GITHUB_OUTPUT
-          fi
-     
-      # Generate release notes for non-feature releases
-      - name: Prepare infrastructure release notes
-        if: steps.tag-message.outputs.RELEASE_TYPE == 'infrastructure'
-        id: infra-notes
-        run: echo "NOTES=## Non-User-Facing Release\nThis is an infrastructure update that improves build processes but does not change functionality." >> $GITHUB_OUTPUT
-        
-      - name: Prepare developer release notes
-        if: steps.tag-message.outputs.RELEASE_TYPE == 'developer'
-        id: dev-notes
-        run: echo "NOTES=## Non-User-Facing Release\nThis is a developer tools update that does not change extension functionality." >> $GITHUB_OUTPUT
-        
-      - name: Prepare marketplace note
-        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'false'
-        id: marketplace-note
-        run: echo "NOTES=**Note:** This release is not published to the VS Code Marketplace." >> $GITHUB_OUTPUT
+          VSIX=$(ls *.vsix | head -n1)
+          echo "vsix=$VSIX" >>"$GITHUB_OUTPUT"
+          echo "Found VSIX: $VSIX"
 
-      - name: Publish to VS Code Marketplace
-        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'true'
-        run: yarn vsce publish --packagePath ${{ steps.vsix-name.outputs.VSIX_PATH }} -p "${{ secrets.VSCODE_MARKETPLACE_PAT }}"
-     
-      - name: Publish to Open VSX Registry
-        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'true'
-        run: yarn ovsx publish ${{ steps.vsix-name.outputs.VSIX_PATH }} -p "${{ secrets.OPEN_VSX_PAT }}"
-     
-      - name: Create GitHub Release
+      # ────────── read flags embedded in the annotated tag ──────────
+      - name: 🗂️ Parse tag JSON
+        id: tag_meta
+        shell: bash
+        run: |
+          TAG_JSON=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
+          echo "tag_json=$TAG_JSON" >>"$GITHUB_OUTPUT"
+          PUBLISH=$(jq -r '.PUBLISH_MARKETPLACE // "true"' <<<"$TAG_JSON")
+          TYPE=$(jq -r '.RELEASE_TYPE // "feature"'          <<<"$TAG_JSON")
+          echo "publish=$PUBLISH" >>"$GITHUB_OUTPUT"
+          echo "rtype=$TYPE"      >>"$GITHUB_OUTPUT"
+
+      # ────────── Marketplace / Open VSX publish (optional) ──────────
+      - name: 🚢 Publish to VS Code Marketplace
+        if: steps.tag_meta.outputs.publish == 'true'
+        run: |
+          yarn vsce publish \
+            --packagePath "${{ steps.vsix.outputs.vsix }}" \
+            -p "${{ secrets.VSCODE_MARKETPLACE_PAT }}"
+
+      - name: 🚢 Publish to Open VSX
+        if: steps.tag_meta.outputs.publish == 'true'
+        run: |
+          yarn ovsx publish "${{ steps.vsix.outputs.vsix }}" \
+            -p "${{ secrets.OPEN_VSX_PAT }}" \
+            --timeout 300000
+
+      # ────────── compose extra release notes (always sets body output) ──────────
+      - name: ✍️ Prepare notes
+        id: notes
+        shell: bash
+        run: |
+          TYPE="${{ steps.tag_meta.outputs.rtype }}"
+          PUBLISH="${{ steps.tag_meta.outputs.publish }}"
+          BODY=""
+          if [[ "$TYPE" == "infrastructure" ]]; then
+            BODY="## Non-User-Facing Release\nInfrastructure / CI updates."
+          elif [[ "$TYPE" == "developer" ]]; then
+            BODY="## Developer-Tools Release\nDocs or tooling only."
+          fi
+          if [[ "$PUBLISH" == "false" ]]; then
+            BODY="${BODY}\n\n**Note:** This version is *not* published to the VS Code Marketplace."
+          fi
+          echo "body<<EOF" >>"$GITHUB_OUTPUT"
+          echo -e "$BODY"  >>"$GITHUB_OUTPUT"
+          echo "EOF"       >>"$GITHUB_OUTPUT"
+
+      # ────────── GitHub Release with VSIX asset ──────────
+      - name: 📦 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.vsix-name.outputs.VSIX_PATH }}
-          name: "${{ steps.tag-message.outputs.RELEASE_TYPE == 'feature' && '' || format('[{0}] ', steps.tag-message.outputs.RELEASE_TYPE) }}Release ${{ github.ref_name }}"
-          body: |
-            ${{ steps.infra-notes.outputs.NOTES || steps.dev-notes.outputs.NOTES || '' }}
-            
-            ${{ steps.marketplace-note.outputs.NOTES || '' }}
+          files:  ${{ steps.vsix.outputs.vsix }}
+          name:   ${{ steps.tag_meta.outputs.rtype == 'feature' && '' || format('[{0}] ', steps.tag_meta.outputs.rtype) }}Release ${{ github.ref_name }}
+          body:   ${{ steps.notes.outputs.body }}
           draft: false
           prerelease: false
           generate_release_notes: true
