@@ -1,14 +1,21 @@
 name: CI/CD Pipeline
+
 on:
   push:
-    branches: [main]
+    branches: 
+      - 'main'
+      - 'release-*'
     tags:
-      - 'v*' # Trigger on version tags
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,12 +46,12 @@ jobs:
     if: success() && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Needed for creating releases
-    
+      contents: write
+   
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history and tags
+          fetch-depth: 0
      
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,6 +76,7 @@ jobs:
         run: |
           TAG_MESSAGE=$(git tag -l --format='%(contents)' ${{ github.ref_name }})
           echo "TAG_MESSAGE=$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          
           # Try to extract publish flag from JSON in tag message
           if [[ "$TAG_MESSAGE" == *"PUBLISH_MARKETPLACE"* ]]; then
             PUBLISH_MARKETPLACE=$(echo $TAG_MESSAGE | grep -o '"PUBLISH_MARKETPLACE":"[^"]*"' | cut -d'"' -f4)
@@ -76,6 +84,7 @@ jobs:
           else
             echo "PUBLISH_MARKETPLACE=true" >> $GITHUB_OUTPUT
           fi
+          
           # Try to extract release type from JSON in tag message
           if [[ "$TAG_MESSAGE" == *"RELEASE_TYPE"* ]]; then
             RELEASE_TYPE=$(echo $TAG_MESSAGE | grep -o '"RELEASE_TYPE":"[^"]*"' | cut -d'"' -f4)
@@ -84,6 +93,22 @@ jobs:
             echo "RELEASE_TYPE=feature" >> $GITHUB_OUTPUT
           fi
      
+      # Generate release notes for non-feature releases
+      - name: Prepare infrastructure release notes
+        if: steps.tag-message.outputs.RELEASE_TYPE == 'infrastructure'
+        id: infra-notes
+        run: echo "NOTES=## Non-User-Facing Release\nThis is an infrastructure update that improves build processes but does not change functionality." >> $GITHUB_OUTPUT
+        
+      - name: Prepare developer release notes
+        if: steps.tag-message.outputs.RELEASE_TYPE == 'developer'
+        id: dev-notes
+        run: echo "NOTES=## Non-User-Facing Release\nThis is a developer tools update that does not change extension functionality." >> $GITHUB_OUTPUT
+        
+      - name: Prepare marketplace note
+        if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'false'
+        id: marketplace-note
+        run: echo "NOTES=**Note:** This release is not published to the VS Code Marketplace." >> $GITHUB_OUTPUT
+
       - name: Publish to VS Code Marketplace
         if: steps.tag-message.outputs.PUBLISH_MARKETPLACE == 'true'
         run: yarn vsce publish --packagePath ${{ steps.vsix-name.outputs.VSIX_PATH }} -p "${{ secrets.VSCODE_MARKETPLACE_PAT }}"
@@ -97,6 +122,10 @@ jobs:
         with:
           files: ${{ steps.vsix-name.outputs.VSIX_PATH }}
           name: "${{ steps.tag-message.outputs.RELEASE_TYPE == 'feature' && '' || format('[{0}] ', steps.tag-message.outputs.RELEASE_TYPE) }}Release ${{ github.ref_name }}"
+          body: |
+            ${{ steps.infra-notes.outputs.NOTES || steps.dev-notes.outputs.NOTES || '' }}
+            
+            ${{ steps.marketplace-note.outputs.NOTES || '' }}
           draft: false
           prerelease: false
           generate_release_notes: true

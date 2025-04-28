@@ -15,6 +15,7 @@ export default [
       'build-webview.js',
       'esbuild.js',
       'jest.config.js',
+      'webpack.config.js',
       'scripts/**',
       '**/*.md',
       '**/LICENSE',
