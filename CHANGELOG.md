@@ -5,28 +5,77 @@ All notable changes to the PatchPilot extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.12] - 2025-04-28
+
+### Infrastructure 1.0.12
+
+- **Docs**  
+  - README gains *Installation*, *Commands & Keybindings*, *Changelog* and *Contributing* sections.  
+  - Shields badges use `cacheSeconds=7200` to avoid Marketplace rate-limits.  
+  - Demo image switched to a resizable `<img width="600">` tag.
+- **Release type:** *infrastructure only* – **not** published to the Marketplace.
+
+## [1.0.11] - 2025-04-28
+
+### Infrastructure 1.0.11
+
+- **CI/CD**  
+  - Publish job now verifies Marketplace/Open VSX PAT secrets before running.  
+  - Single `git push --follow-tags` ensures branch *and* tag are uploaded atomically.
+- **Release script** (`scripts/release.js`)  
+  - Fast-forward guard: aborts if `main` is behind `origin/main`.  
+  - Early exit when PATs are missing while `--skip-marketplace` is *not* set.  
+  - Pushes release branch with `--set-upstream --follow-tags` in one step.
+- **Release type:** *infrastructure only* – **not** published to the Marketplace.
+
+---
+
+## [1.0.10] - 2025-04-27
+
+### Infrastructure 1.0.10
+
+- Split CI into **build** and **publish** jobs; publish runs only on `v*` tags.  
+- Added secret-presence check step before publishing.  
+- Release script now annotates tags with JSON (`PUBLISH_MARKETPLACE`, `RELEASE_TYPE`).  
+- *No functional changes – Marketplace not updated.*
+
+---
+
+## [1.0.9] - 2025-04-27
+
+### Fixed 1.0.9
+
+- Webview Content-Security-Policy warnings during packaging.  
+- CommonJS/ESM export warning in `applyPatch.ts`.
+
+### Added
+
+- Rate-limit-friendly shields.io badges (`cacheSeconds=7200`).
+
+---
+
 ## [1.0.7] - 2025-04-26
 
 ### Added 1.0.7
 
-- modified commit script to be more robust, added semver
+- Modified commit script to be more robust; integrated **semver**.
 
 ## [1.0.6] - 2025-04-26
 
 ### Added 1.0.6
 
-- Github templates added
+- GitHub issue templates.
 
 ## [1.0.5] - 2025-04-26
 
-### Added 1.0.5
+### Added / Fixed 1.0.5
 
-- Fixed linting error with empty try catch
-- Improved CI/CD pipeline for GitHub releases
+- Fixed linting error with empty `try … catch`.
+- Improved CI/CD pipeline for GitHub Releases.
 
 ## [1.0.4] - 2025-04-26
 
-### Fixed
+### Fixed 1.0.4
 
 - Fixed linting error with empty try catch
 - Improved CI/CD pipeline for GitHub releases
