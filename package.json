@@ -2,7 +2,7 @@
   "name": "patch-pilot",
   "displayName": "PatchPilot",
   "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
@@ -96,15 +96,15 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "yarn compile",
-    "compile": "tsc -p ./ && tsc -p ./tsconfig.webview.json && node build-webview.js",
-    "watch": "tsc -watch -p ./ & tsc -watch -p ./tsconfig.webview.json",
+    "vscode:prepublish": "webpack --mode production",
+    "compile": "webpack --mode development",
+    "watch": "webpack --watch --mode development",
     "debug": "code --extensionDevelopmentPath=. --inspect-extensions=9229",
     "watch:dev": "concurrently \"yarn watch\" \"code --extensionDevelopmentPath=.\"",
     "build:webview": "node build-webview.js",
     "watch:webview": "node build-webview.js --watch",
     "start": "node ./out/extension.js",
-    "dev": "yarn compile && node -e \"require('child_process').spawn('code', ['--new-window', '--extensionDevelopmentPath=' + process.cwd()], {stdio:'inherit', shell:true})\"",
+    "dev": "webpack --mode development && code --new-window --extensionDevelopmentPath=.",
     "package": "vsce package",
     "publish": "vsce publish",
     "release": "node scripts/release.js",
@@ -174,10 +174,13 @@
     "sinon": "^20.0.0",
     "source-map-support": "^0.5.21",
     "ts-jest": "^29.3.2",
+    "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "typescript": "~5.1.6",
     "vsce": "^2.15.0",
-    "vscode-test": "^1.6.1"
+    "vscode-test": "^1.6.1",
+    "webpack": "^5.99.7",
+    "webpack-cli": "^6.0.1"
   },
   "dependencies": {
     "diff": "^5.1.0",

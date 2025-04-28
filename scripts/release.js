@@ -315,7 +315,7 @@ function getReleaseTypeLabel() {
   }
 }
 
-// Main function
+// --- Main function ---
 async function main() {
   try {
     if (config.dryRun) {
@@ -574,11 +574,11 @@ async function main() {
     }
     
     console.log('\n🔍 This will perform:');
-    console.log('  1. git add .');
-    console.log(`  2. git commit -m "${commitMessage}"`);
-    console.log(`  3. git tag ${tagName}`);
-    console.log(`  4. git push origin ${status.current}`);
-    console.log(`  5. git push origin ${tagName}`);
+    console.log('  1. Create a release branch');
+    console.log('  2. git add .');
+    console.log(`  3. git commit -m "${commitMessage}"`);
+    console.log(`  4. git tag ${tagName}`);
+    console.log(`  5. Push branch and tag to origin`);
     console.log(`  6. Set CI/CD variables for marketplace publishing: ${config.publishToMarketplace ? 'Yes' : 'No'}`);
     
     if (config.dryRun) {
@@ -595,52 +595,139 @@ async function main() {
     // --- Execution ---
     console.log('\n🚀 Executing release commands...');
     
-    // 1. Stage changes
-    console.log('  ⏳ Staging changes...');
-    await git.add('.');
-    console.log('  ✅ Changes staged.');
+    // Save current branch to return to later
+    const originalBranch = status.current;
     
-    // 2. Commit
-    console.log(`  ⏳ Committing with message: "${commitMessage}"...`);
-    await git.commit(commitMessage);
-    console.log('  ✅ Commit created.');
+    // 1. Create a release branch
+    const currentDate = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const releaseBranchName = `release-${newVersion.replace(/\./g, '-')}-${currentDate}`;
+    console.log(`  ⏳ Creating release branch '${releaseBranchName}'...`);
     
-    // 3. Tag
-    console.log(`  ⏳ Creating tag '${tagName}'...`);
-    
-    // Include CI/CD variables in tag message
-    const tagMessage = JSON.stringify(ciEnvVars);
-    await git.addAnnotatedTag(tagName, tagMessage);
-    console.log('  ✅ Tag created with CI/CD metadata.');
-    
-    // 4. Push commit
-    console.log(`  ⏳ Pushing commit to origin/${status.current}...`);
-    await git.push('origin', status.current);
-    console.log('  ✅ Commit pushed.');
-    
-    // 5. Push tag
-    console.log(`  ⏳ Pushing tag '${tagName}' to origin...`);
-    await git.push('origin', tagName);
-    console.log('  ✅ Tag pushed.');
-    
-    // --- Run post-release hook ---
-    if (config.hooks.afterRelease) {
-      console.log('\n🔄 Running post-release hook...');
+    try {
+      // Create and checkout release branch
+      await git.checkoutBranch(releaseBranchName, originalBranch);
+      console.log(`  ✅ Created and switched to new branch '${releaseBranchName}'.`);
+      
+      // 2. Stage changes
+      console.log('  ⏳ Staging changes...');
+      await git.add('.');
+      console.log('  ✅ Changes staged.');
+      
+      // 3. Commit
+      console.log(`  ⏳ Committing with message: "${commitMessage}"...`);
+      await git.commit(commitMessage);
+      console.log('  ✅ Commit created.');
+      
+      // 4. Tag
+      console.log(`  ⏳ Creating tag '${tagName}'...`);
+      
+      // Include CI/CD variables in tag message
+      const tagMessage = JSON.stringify(ciEnvVars);
+      await git.addAnnotatedTag(tagName, tagMessage);
+      console.log('  ✅ Tag created with CI/CD metadata.');
+      
+      // 5. Fetch latest changes
+      console.log('  ⏳ Fetching latest changes from remote...');
       try {
-        const { execSync } = require('child_process');
-        execSync(config.hooks.afterRelease, { stdio: 'inherit' });
-      } catch (error) {
-        console.error(`⚠️ Warning: Post-release hook failed: ${error.message}`);
+        await git.fetch('origin');
+        console.log('  ✅ Fetched latest changes.');
+      } catch (fetchError) {
+        console.warn(`  ⚠️ Warning: Could not fetch from remote: ${fetchError.message}`);
+        const proceedAfterFetch = await askYesNo('Continue with push anyway?');
+        if (!proceedAfterFetch) {
+          console.log(`\n🔄 Returning to original branch '${originalBranch}'...`);
+          await git.checkout(originalBranch);
+          console.log('🚫 Release canceled. Your changes are on local branch.');
+          process.exit(0);
+        }
       }
-    }
+      
+      // 6. Push branch
+      console.log(`  ⏳ Pushing branch to origin/${releaseBranchName}...`);
+      try {
+        await git.push('origin', releaseBranchName, ['--set-upstream']);
+        console.log(`  ✅ Branch '${releaseBranchName}' pushed to origin.`);
+      } catch (pushBranchError) {
+        console.error(`  ❌ Branch push failed: ${pushBranchError.message}`);
+        const proceedAfterPush = await askYesNo('Continue with tag push anyway?');
+        if (!proceedAfterPush) {
+          console.log(`\n🔄 Returning to original branch '${originalBranch}'...`);
+          await git.checkout(originalBranch);
+          console.log('🚫 Release push canceled. Your changes are on local branch.');
+          process.exit(0);
+        }
+      }
+      
+      // 7. Push tag
+      console.log(`  ⏳ Pushing tag '${tagName}' to origin...`);
+      try {
+        await git.push('origin', tagName);
+        console.log('  ✅ Tag pushed.');
+      } catch (pushTagError) {
+        console.error(`  ❌ Tag push failed: ${pushTagError.message}`);
+        console.log('  Continuing release process without tag push. You may need to push the tag manually.');
+      }
+      
+      // --- Run post-release hook ---
+      if (config.hooks.afterRelease) {
+        console.log('\n🔄 Running post-release hook...');
+        try {
+          const { execSync } = require('child_process');
+          execSync(config.hooks.afterRelease, { stdio: 'inherit' });
+        } catch (hookError) {
+          console.error(`⚠️ Warning: Post-release hook failed: ${hookError.message}`);
+        }
+      }
+      
+      // 8. Extract repo details for PR link
+      let repoUrl = '';
+      try {
+        if (packageJson.repository && packageJson.repository.url) {
+          const urlMatch = packageJson.repository.url.match(/github\.com[/:]([\w-]+\/[\w-]+)(?:\.git)?/);
+          if (urlMatch && urlMatch[1]) {
+            repoUrl = urlMatch[1];
+          }
+        }
+      } catch (parseError) {
+        // Ignore parsing errors
+      }
+      
+      // 9. Provide PR creation instructions
+      console.log('\n🔍 Next steps:');
+      if (repoUrl) {
+        console.log(`  1. Go to: https://github.com/${repoUrl}/pull/new/${releaseBranchName}`);
+      } else {
+        console.log('  1. Go to your GitHub repository and create a new pull request');
+      }
+      console.log(`  2. Create a pull request from '${releaseBranchName}' to '${config.mainBranch}'`);
+      console.log('  3. Wait for CI/CD to complete and approve the PR');
+      
+      // 10. Return to original branch
+      console.log(`\n🔄 Returning to original branch '${originalBranch}'...`);
+      await git.checkout(originalBranch);
+      console.log(`  ✅ Switched back to '${originalBranch}'.`);
+      
+      console.log(`\n🎉 Release ${tagName} process completed successfully!`);
+      if (config.publishToMarketplace) {
+        console.log('After merging the PR, CI/CD pipeline will trigger the publish job for VS Code Marketplace.');
+      } else {
+        console.log('After merging the PR, GitHub release will be created, but this version will not be published to VS Code Marketplace.');
+      }
     
-    console.log(`\n🎉 Release ${tagName} process completed successfully!`);
-    if (config.publishToMarketplace) {
-      console.log('CI/CD pipeline should now trigger the publish job for VS Code Marketplace.');
-    } else {
-      console.log('GitHub release will be created, but this version will not be published to VS Code Marketplace.');
+    } catch (error) {
+      console.error('\n❌ Release process failed:');
+      console.error(error);
+      
+      // Try to return to original branch on error
+      try {
+        await git.checkout(originalBranch);
+        console.log(`\n🔄 Returned to original branch '${originalBranch}'.`);
+      } catch (checkoutError) {
+        console.error(`\n⚠️ Could not return to original branch: ${checkoutError.message}`);
+      }
+      
+      process.exit(1);
     }
-    
   } catch (error) {
     console.error('\n❌ Release process failed:');
     console.error(error);
