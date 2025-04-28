@@ -324,6 +324,13 @@ async function main() {
     
     console.log('🚀 Starting PatchPilot Release Process...');
     const git = simpleGit();
+
+    await git.fetch('origin', config.mainBranch);
+    const status2 = await git.status();
+    if (status2.behind > 0) {
+      console.error(`❌ Your branch is ${status2.behind} commit(s) behind origin/${config.mainBranch}. git pull --ff-only first.`);
+      process.exit(1);
+    }
     
     // --- Checks ---
     console.log('\n🔍 Performing checks...');
@@ -487,6 +494,12 @@ async function main() {
       console.error(`❌ Error: Tag '${tagName}' already exists`);
       process.exit(1);
     }
+
+    const remoteTags = await git.listRemote(['--tags', 'origin']);
+    if (remoteTags.includes(tagName)) {
+      console.error(`❌ Remote already has tag ${tagName}. Bump version or delete it first.`);
+      process.exit(1);
+    }
     
     // --- Get release message ---
     console.log('\n✍️ Preparing release message...');
@@ -555,7 +568,8 @@ async function main() {
     const ciEnvVars = {
       RELEASE_VERSION: newVersion,
       RELEASE_TYPE: config.releaseType,
-      PUBLISH_MARKETPLACE: config.publishToMarketplace ? 'true' : 'false'
+      PUBLISH_MARKETPLACE: config.publishToMarketplace ? 'true' : 'false',
+      MISSING_PATS: config.publishToMarketplace && !process.env.VSCODE_MARKETPLACE_PAT ? 'true' : 'false'
     };
     
     // --- Confirmation ---
@@ -642,30 +656,23 @@ async function main() {
         }
       }
       
-      // 6. Push branch
-      console.log(`  ⏳ Pushing branch to origin/${releaseBranchName}...`);
+      // 6. Push release branch **with tags**
+      console.log(`  ⏳ Pushing '${releaseBranchName}' (and tags) to origin…`);
       try {
-        await git.push('origin', releaseBranchName, ['--set-upstream']);
-        console.log(`  ✅ Branch '${releaseBranchName}' pushed to origin.`);
-      } catch (pushBranchError) {
-        console.error(`  ❌ Branch push failed: ${pushBranchError.message}`);
-        const proceedAfterPush = await askYesNo('Continue with tag push anyway?');
-        if (!proceedAfterPush) {
-          console.log(`\n🔄 Returning to original branch '${originalBranch}'...`);
+        await git.push('origin', releaseBranchName, {
+          '--set-upstream': null,
+          '--follow-tags': null        // ensures vX.Y.Z goes up with the branch
+        });
+        console.log(`  ✅ Branch '${releaseBranchName}' and all tags pushed.`);
+      } catch (pushError) {
+        console.error(`  ❌ Push failed: ${pushError.message}`);
+        const proceed = await askYesNo('Try to continue anyway? You may need to push manually later.');
+        if (!proceed) {
+          console.log(`\n🔄 Returning to original branch '${originalBranch}'…`);
           await git.checkout(originalBranch);
-          console.log('🚫 Release push canceled. Your changes are on local branch.');
-          process.exit(0);
+          console.log('🚫 Release aborted; your changes remain on the release branch locally.');
+          process.exit(1);
         }
-      }
-      
-      // 7. Push tag
-      console.log(`  ⏳ Pushing tag '${tagName}' to origin...`);
-      try {
-        await git.push('origin', tagName);
-        console.log('  ✅ Tag pushed.');
-      } catch (pushTagError) {
-        console.error(`  ❌ Tag push failed: ${pushTagError.message}`);
-        console.log('  Continuing release process without tag push. You may need to push the tag manually.');
       }
       
       // --- Run post-release hook ---
