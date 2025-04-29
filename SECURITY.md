@@ -10,7 +10,7 @@
 
 To report a security vulnerability, please do NOT create a public GitHub issue.
 
-Instead, please email [INSERT YOUR EMAIL] with details about the vulnerability.
+Instead, please email dsj7419@gmail.com with details about the vulnerability.
 
 We aim to acknowledge receipt of your report within 48 hours and will strive to provide more information about the status of the vulnerability and our planned fixes as soon as possible.
 
