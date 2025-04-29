@@ -294,5 +294,3 @@ Benchmarks reflect average speedup using PatchPilot's adaptive strategy selectio
 - Inspired by everyday AI development challenges.
 
 ---
-
-**Thanks for using PatchPilot! ✈️ Happy coding!**
