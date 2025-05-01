@@ -55,7 +55,7 @@ ext install patchpilot.patch-pilot
 - `Ctrl+Shift+P` → **`PatchPilot: Paste Diff`** → Preview → Apply.
 
 - Create a git branch
-- `Ctrl+Shift+P` → **`PatchPilot: Branch for Patch`** → Preview → Apply.
+- `Ctrl+Shift+P` → **`PatchPilot: Create Branch for Patch`** → Preview → Apply.
 
 ### Via Context Menu
 
