@@ -637,7 +637,10 @@ async function main() {
       
       // Include CI/CD variables in tag message
       const tagMessage = JSON.stringify(ciEnvVars);
-      await git.tag(['-a', tagName, '-m', tagMessage]);
+      const tmp = path.join(require('os').tmpdir(), `${tagName}.json`);
+      fs.writeFileSync(tmp, tagMessage, 'utf8');
+      await git.tag(['-a', tagName, '-F', tmp]);
+      fs.unlinkSync(tmp);
       console.log('  ✅ Tag created with CI/CD metadata.');
 
       const head = (await git.revparse(['HEAD'])).trim();
