@@ -637,8 +637,16 @@ async function main() {
       
       // Include CI/CD variables in tag message
       const tagMessage = JSON.stringify(ciEnvVars);
-      await git.addAnnotatedTag(tagName, tagMessage);
+      await git.tag(['-a', tagName, '-m', tagMessage]);
       console.log('  ✅ Tag created with CI/CD metadata.');
+
+      const head = (await git.revparse(['HEAD'])).trim();
+      const tip  = (await git.revparse([tagName])).trim();
+      if (head !== tip) {
+        throw new Error(`Tag ${tagName} is not on HEAD – did you commit the version bump?`);
+      }
+
+      console.log(`\n🔔 Tag ${tagName} pushed – the CI/CD pipeline will now run automatically on GitHub.`);
       
       // 5. Fetch latest changes
       console.log('  ⏳ Fetching latest changes from remote...');
