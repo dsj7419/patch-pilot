@@ -1,5 +1,9 @@
 # .github/workflows/ci.yml
 name: CI / CD Pipeline
+permissions:
+  contents: write     # Needed for creating releases
+  packages: read      # Needed for dependency resolution
+  actions: read       # Needed for workflow runs
 
 ###############################################################################
 #  🔔 Triggers
