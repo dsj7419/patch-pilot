@@ -108,12 +108,37 @@ jobs:
         id: tag_meta
         shell: bash
         run: |
+          # Get tag message contents
           TAG_JSON=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
-          echo "tag_json=$TAG_JSON" >>"$GITHUB_OUTPUT"
-          PUBLISH=$(jq -r '.PUBLISH_MARKETPLACE // "true"' <<<"$TAG_JSON")
-          TYPE=$(jq -r '.RELEASE_TYPE // "feature"'          <<<"$TAG_JSON")
+          
+          # Log the raw tag contents for debugging
+          echo "Raw tag contents:"
+          echo "$TAG_JSON"
+          
+          # Set default values
+          PUBLISH="true"
+          TYPE="feature"
+          
+          # Try to parse JSON with error handling
+          if [[ -n "$TAG_JSON" ]]; then
+            echo "tag_json=$TAG_JSON" >>"$GITHUB_OUTPUT"
+            if echo "$TAG_JSON" | jq -e . >/dev/null 2>&1; then
+              # Valid JSON - extract values
+              PUBLISH=$(jq -r '.PUBLISH_MARKETPLACE // "true"' <<<"$TAG_JSON")
+              TYPE=$(jq -r '.RELEASE_TYPE // "feature"' <<<"$TAG_JSON")
+              echo "✅ Successfully parsed tag metadata"
+            else
+              echo "⚠️ Tag message is not valid JSON, using default values"
+            fi
+          else
+            echo "⚠️ No tag message found, using default values"
+          fi
+          
+          # Output the values that will be used
+          echo "📊 Publishing to marketplace: $PUBLISH"
+          echo "📊 Release type: $TYPE"
           echo "publish=$PUBLISH" >>"$GITHUB_OUTPUT"
-          echo "rtype=$TYPE"      >>"$GITHUB_OUTPUT"
+          echo "rtype=$TYPE" >>"$GITHUB_OUTPUT"
 
       # ────────── Marketplace / Open VSX publish (optional) ──────────
       - name: 🚢 Publish to VS Code Marketplace
