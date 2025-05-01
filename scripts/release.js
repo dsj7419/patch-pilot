@@ -82,6 +82,33 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === '--help' || arg === '-h') {
     printHelp();
     process.exit(0);
+  } else if (arg === '--debug-tags' || arg === '-dt') {
+    const debugTags = async () => {
+      try {
+        const git = simpleGit();
+        const tags = await git.tags();
+        console.log('🏷️ Available tags:');
+        for (const tag of tags.all) {
+          console.log(`\nTag: ${tag}`);
+          try {
+            const tagJson = await git.raw(['tag', '-l', '--format=%(contents)', tag]);
+            console.log(`📋 Metadata: ${tagJson.trim() || '(empty)'}`);
+            
+            const commitSha = await git.raw(['rev-parse', `${tag}^{}`]);
+            console.log(`🔗 Commit: ${commitSha.trim()}`);
+            
+            const commitMsg = await git.raw(['log', '-1', '--format=%B', commitSha.trim()]);
+            console.log(`💬 Commit message: ${commitMsg.trim()}`);
+          } catch (err) {
+            console.log(`❌ Error processing tag: ${err.message}`);
+          }
+        }
+      } catch (err) {
+        console.error(`❌ Debug mode error: ${err.message}`);
+      }
+      process.exit(0);
+    };
+    debugTags();
   }
 }
 
@@ -102,6 +129,7 @@ Options:
   --category, -c <type>      Release category: feature, infrastructure, developer
   --skip-marketplace, -s     Skip publishing to VS Code Marketplace
   --dry-run, -d              Show what would happen without making changes
+  --debug-tags, -dt          Show information about existing tags
   --help, -h                 Show this help message
 
 Examples:
@@ -568,8 +596,7 @@ async function main() {
     const ciEnvVars = {
       RELEASE_VERSION: newVersion,
       RELEASE_TYPE: config.releaseType,
-      PUBLISH_MARKETPLACE: config.publishToMarketplace ? 'true' : 'false',
-      MISSING_PATS: config.publishToMarketplace && !process.env.VSCODE_MARKETPLACE_PAT ? 'true' : 'false'
+      PUBLISH_MARKETPLACE: config.publishToMarketplace ? 'true' : 'false'
     };
     
     // --- Confirmation ---
@@ -636,20 +663,47 @@ async function main() {
       console.log(`  ⏳ Creating tag '${tagName}'...`);
       
       // Include CI/CD variables in tag message
-      const tagMessage = JSON.stringify(ciEnvVars);
-      const tmp = path.join(require('os').tmpdir(), `${tagName}.json`);
-      fs.writeFileSync(tmp, tagMessage, 'utf8');
-      await git.tag(['-a', tagName, '-F', tmp]);
-      fs.unlinkSync(tmp);
+      const tagMetadata = {
+        RELEASE_VERSION: newVersion,
+        RELEASE_TYPE: config.releaseType,
+        PUBLISH_MARKETPLACE: config.publishToMarketplace ? 'true' : 'false'
+      };
+      const tagMessage = JSON.stringify(tagMetadata, null, 2);
+      console.log(`  📋 Tag metadata: ${tagMessage}`);
+      await git.tag(['-a', tagName, '-m', tagMessage]);
       console.log('  ✅ Tag created with CI/CD metadata.');
 
-      const head = (await git.revparse(['HEAD'])).trim();
-      const tip  = (await git.revparse([tagName])).trim();
-      if (head !== tip) {
-        throw new Error(`Tag ${tagName} is not on HEAD – did you commit the version bump?`);
+      // Verify tag points to HEAD commit
+      console.log('  ⏳ Verifying tag points to HEAD commit...');
+      try {
+        // Use ^{} to dereference the annotated tag to get the commit it points to
+        const head = (await git.revparse(['HEAD'])).trim();
+        const tip = (await git.revparse([`${tagName}^{}`])).trim();
+        
+        if (head !== tip) {
+          throw new Error(`Tag ${tagName} is not correctly pointing to HEAD commit`);
+        }
+        console.log('  ✅ Tag verification successful');
+      } catch (error) {
+        if (error.message.includes('not correctly pointing')) {
+          throw error;
+        }
+        
+        // For older git versions that might not support the ^{} syntax
+        console.log('  ⚠️ Using fallback tag verification method');
+        
+        // Alternative approach using merge-base to check if the tag is an ancestor of HEAD
+        const isTagged = await git.raw(['merge-base', '--is-ancestor', tagName, 'HEAD'])
+          .then(() => true)
+          .catch(() => false);
+        
+        if (!isTagged) {
+          throw new Error(`Tag ${tagName} is not on HEAD – did you commit the version bump?`);
+        }
+        console.log('  ✅ Tag verification successful (using fallback method)');
       }
 
-      console.log(`\n🔔 Tag ${tagName} pushed – the CI/CD pipeline will now run automatically on GitHub.`);
+      console.log(`\n🔔 Tag ${tagName} created successfully!`);
       
       // 5. Fetch latest changes
       console.log('  ⏳ Fetching latest changes from remote...');
