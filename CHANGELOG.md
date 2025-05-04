@@ -15,14 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added detailed logging to the "PatchPilot" output channel when hunk header corrections occur.
 - Added telemetry events (`hunk_correction_applied`, `hunk_correction_skipped_disabled`) to track feature usage and effectiveness.
 
-### Fixed
-
-- *(Include any bug fixes that are also part of this release, if applicable)*
-
-### Changed
-
-- *(Include any changes in existing functionality, if applicable)*
-
 ## [1.1.2] - 2025-04-28
 
 ### Infrastructure 1.1.2
