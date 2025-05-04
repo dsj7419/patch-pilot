@@ -77,4 +77,7 @@ export interface FileInfo {
     additions: number; 
     deletions: number; 
   };
+  
+  /** Whether hunk headers were corrected by the HunkCorrectorService */
+  hunkHeadersCorrected?: boolean;
 }

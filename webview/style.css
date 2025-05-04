@@ -318,6 +318,22 @@ p {
   border-radius: 2px;
 }
 
+/* Correction indicator styles */
+.correction-indicator {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--vscode-notificationsInfoIcon-foreground, var(--vscode-descriptionForeground));
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  transition: opacity 0.2s ease;
+}
+
+.correction-indicator:hover {
+  opacity: 0.8;
+}
+
 /* Keyboard shortcuts */
 kbd {
   display: inline-block;

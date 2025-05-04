@@ -2,7 +2,7 @@
   "name": "patch-pilot",
   "displayName": "PatchPilot",
   "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
@@ -47,6 +47,11 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically stage files to Git after applying patches"
+        },
+        "patchPilot.autoCorrectHunkHeaders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically correct inaccurate line counts found in hunk headers (e.g., @@ -1,5 +1,6 @@) often present in AI-generated diffs. Disable if this causes issues with specific patches."
         },
         "patchPilot.fuzzFactor": {
           "type": "number",

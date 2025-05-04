@@ -18,6 +18,7 @@ import {
   DiffParsedPatch,
 } from './types/patchTypes';
 import { useOptimizedStrategies } from './strategies/optimizedPatchStrategy';
+import { correctHunkHeaders, CorrectionReport } from './services/hunkCorrectorService';
 
 /* ────────────────────── Multi‑file entry point ─────────────────────────── */
 
@@ -32,6 +33,7 @@ export async function applyPatch(
   const fuzz = (opts.fuzz ?? cfg.get('fuzzFactor', 2)) as 0 | 1 | 2 | 3;
   const preview = opts.preview ?? true;
   const mtimeCheck = opts.mtimeCheck ?? cfg.get('mtimeCheck', true);
+  const autoCorrectSetting = cfg.get<boolean>('autoCorrectHunkHeaders', true);
 
   const canonical = normalizeDiff(patchText);
   const patches = DiffLib.parsePatch(canonical) as DiffParsedPatch[];
@@ -39,10 +41,42 @@ export async function applyPatch(
     throw new Error('No valid patches found in the provided text.');
   }
 
+  let correctedPatches: DiffParsedPatch[];
+  let correctionDetails: CorrectionReport = { correctionsMade: false, corrections: [] };
+
+  if (autoCorrectSetting) {
+    const correctorResult = correctHunkHeaders(patches);
+    correctedPatches = correctorResult.correctedPatches;
+    correctionDetails = correctorResult.correctionDetails;
+
+    if (correctionDetails.correctionsMade) {
+      const output = vscode.window.createOutputChannel('PatchPilot');
+      output.appendLine('ℹ️ Automatically corrected hunk header line counts for accuracy:');
+      
+      for (const correction of correctionDetails.corrections) {
+        output.appendLine(` - ${correction.filePath} [Hunk ${correction.hunkIndex}]: Old lines ${correction.originalOld} -> ${correction.correctedOld}, New lines ${correction.originalNew} -> ${correction.correctedNew}`);
+      }
+      
+      output.show();
+      
+      trackEvent('hunk_correction_applied', {}, {
+        fileCount: correctedPatches.length,
+        correctedFileCount: new Set(correctionDetails.corrections.map(c => c.filePath)).size,
+        totalHunkCount: correctedPatches.reduce((sum, p) => sum + p.hunks.length, 0),
+        correctedHunkCount: correctionDetails.corrections.length
+      });
+    }
+  } else {
+    correctedPatches = patches as DiffParsedPatch[];
+    trackEvent('hunk_correction_skipped_disabled', {
+      patchCount: patches.length
+    });
+  }
+
   const results: ApplyResult[] = [];
   const staged: string[] = [];
 
-  for (const patch of patches) {
+  for (const patch of correctedPatches) {
     const relPath = extractFilePath(patch) ?? 'unknown-file';
 
     try {
@@ -56,13 +90,11 @@ export async function applyPatch(
         continue;
       }
 
-      // Record file stats before reading to detect external changes
       let fileStats: vscode.FileStat | undefined;
       if (mtimeCheck) {
         try {
           fileStats = await vscode.workspace.fs.stat(fileUri);
         } catch (_err) {
-          // If stat fails, continue anyway but without mtime check
           const output = vscode.window.createOutputChannel('PatchPilot');
           output.appendLine(`Could not get file stats for ${relPath}, skipping mtime check`);
         }
@@ -102,13 +134,10 @@ export async function applyPatch(
         }
       }
 
-      // Check if file was modified externally while we were working
       if (mtimeCheck && fileStats) {
         try {
           const currentStats = await vscode.workspace.fs.stat(fileUri);
           
-          // Compare mtimes directly - in VS Code API these are numbers 
-          // (milliseconds since epoch)
           if (fileStats.mtime !== currentStats.mtime) {
             const confirmOverwrite = await vscode.window.showWarningMessage(
               `File ${relPath} has been modified since reading it. Apply patch anyway?`,
@@ -127,7 +156,6 @@ export async function applyPatch(
             }
           }
         } catch (_err) {
-          // If stat fails at this point, continue but log warning
           const output = vscode.window.createOutputChannel('PatchPilot');
           output.appendLine(`Could not verify file stats for ${relPath}`);
         }
@@ -183,27 +211,21 @@ export async function applyPatchToContent(
   patch: DiffParsedPatch,
   fuzz: 0 | 1 | 2 | 3,
 ): Promise<PatchResult> {
-  // Check if the patch is large - could be performance intensive
   const isLargePatch = patch.hunks.length > 5 || content.length > 100000;
-  const isLargeFile = content.length > 500000; // ~500KB
+  const isLargeFile = content.length > 500000;
   
   if (isLargePatch || isLargeFile) {
-    // Use optimized strategies for large patches or files
-    // This enhances performance with potentially large diffs
     trackEvent('patch_content', { 
       strategy: 'optimized', 
       hunkCount: patch.hunks.length,
       contentSize: content.length
     });
     
-    // Create the standard strategy first
     const standardStrategy = PatchStrategyFactory.createDefaultStrategy(fuzz);
-    // Then wrap it with optimized strategies that handle large files better
     const optimizedStrategy = useOptimizedStrategies(standardStrategy, fuzz);
     
     return optimizedStrategy.apply(content, patch);
   } else {
-    // Use standard strategies for normal patches
     trackEvent('patch_content', { 
       strategy: 'standard', 
       hunkCount: patch.hunks.length,
@@ -263,17 +285,15 @@ async function showPatchPreview(
 
 export function extractFilePath(p: DiffParsedPatch): string | undefined {
   if (p.newFileName && p.newFileName !== '/dev/null') {
-    // Clean both actual control characters and escaped character sequences
     return p.newFileName.replace(/^b\//, '')
-      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
-      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .replace(/[\x00-\x1F\x7F]+/g, '')
+      .replace(/\\r|\\n/g, '')
       .trim();
   }
   if (p.oldFileName && p.oldFileName !== '/dev/null') {
-    // Clean both actual control characters and escaped character sequences
     return p.oldFileName.replace(/^a\//, '')
-      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
-      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
+      .replace(/[\x00-\x1F\x7F]+/g, '')
+      .replace(/\\r|\\n/g, '')
       .trim();
   }
   return undefined;
@@ -285,12 +305,10 @@ async function resolveWorkspaceFile(
   const roots = vscode.workspace.workspaceFolders;
   if (!roots?.length) {throw new Error('No workspace folder open.');}
 
-  // Security improvement: Validate the relative path
   if (!relPath || relPath.includes('..') || relPath.startsWith('/')) {
     throw new Error(`Invalid file path: ${relPath}`);
   }
 
-  // Try each workspace folder
   for (const r of roots) {
     const uri = vscode.Uri.joinPath(r.uri, relPath);
     try {
@@ -301,7 +319,6 @@ async function resolveWorkspaceFile(
     }
   }
 
-  // If not found directly, try finding by filename
   const fname = relPath.split('/').pop() ?? relPath;
   if (!fname || fname === '' || fname === '..' || fname === '.') {
     return undefined;
@@ -310,12 +327,11 @@ async function resolveWorkspaceFile(
   const found = await vscode.workspace.findFiles(
     `**/${fname}`,
     '**/node_modules/**',
-    10 // Limit results to avoid performance issues
+    10
   );
 
   if (found.length === 1) {return found[0];}
   if (found.length > 1) {
-    // Get stats for each found file
     const filesWithStats = [];
     for (const f of found) {
       const stats = await vscode.workspace.fs.stat(f);
@@ -351,25 +367,45 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
   const normalized = normalizeDiff(cleanPatchText);
   const patches = DiffLib.parsePatch(normalized) as DiffParsedPatch[];
 
-  const info: FileInfo[] = [];
-
-  // Performance enhancement: pre-check all files first to avoid redundant workspace queries
-  const filePathMap = new Map<string, boolean>(); // Map of file path to existence status
+  const autoCorrectSetting = vscode.workspace.getConfiguration('patchPilot').get<boolean>('autoCorrectHunkHeaders', true);
   
-  for (const p of patches) {
+  let correctedPatches: DiffParsedPatch[];
+  let correctionDetails: CorrectionReport = { correctionsMade: false, corrections: [] };
+  
+  if (autoCorrectSetting) {
+    const correctorResult = correctHunkHeaders(patches);
+    correctedPatches = correctorResult.correctedPatches;
+    correctionDetails = correctorResult.correctionDetails;
+    
+    if (correctionDetails.correctionsMade) {
+      trackEvent('hunk_correction_applied', {}, {
+        fileCount: correctedPatches.length,
+        correctedFileCount: new Set(correctionDetails.corrections.map(c => c.filePath)).size,
+        totalHunkCount: correctedPatches.reduce((sum, p) => sum + p.hunks.length, 0),
+        correctedHunkCount: correctionDetails.corrections.length
+      });
+    }
+  } else {
+    correctedPatches = patches as DiffParsedPatch[];
+    trackEvent('hunk_correction_skipped_disabled', {
+      patchCount: patches.length
+    });
+  }
+
+  const info: FileInfo[] = [];
+  const filePathMap = new Map<string, boolean>();
+  
+  for (const p of correctedPatches) {
     const path = extractFilePath(p);
     if (!path) {continue;}
     
-    // Skip duplicate paths
     if (filePathMap.has(path)) {continue;}
     
-    // Check if file exists
     const uri = await resolveWorkspaceFile(path);
     filePathMap.set(path, !!uri);
   }
 
-  // Now process each patch with the pre-checked file existence status
-  for (const p of patches) {
+  for (const p of correctedPatches) {
     const path = extractFilePath(p);
     if (!path) {continue;}
 
@@ -383,43 +419,17 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
       }),
     );
 
+    const hasCorrections = autoCorrectSetting && correctionDetails.corrections.some(
+      correction => correction.filePath === path
+    );
+
     info.push({
       filePath: path,
       exists: filePathMap.get(path) ?? false,
       hunks: p.hunks.length,
       changes: { additions: add, deletions: del },
+      hunkHeadersCorrected: hasCorrections
     });
   }
   return info;
 }
-
-// /* ------------------------------------------------------------------ *
-//  *  Jest shim — active only during unit tests, no `any` leaks
-//  * ------------------------------------------------------------------ */
-// type JestLike = {
-//   fn: <A extends unknown[], R>(impl: (...args: A) => R) => (...args: A) => R;
-// };
-
-// function isJest(obj: unknown): obj is JestLike {
-//   return (
-//     typeof obj === 'object' &&
-//     obj !== null &&
-//     'fn' in obj &&
-//     typeof (obj as Record<string, unknown>).fn === 'function'
-//   );
-// }
-
-// const maybeJest = (globalThis as Record<string, unknown>).jest;
-
-// if (isJest(maybeJest)) {
-//   // Create mockable versions of the functions
-//   const mockableApplyPatch = maybeJest.fn(applyPatch);
-//   const mockableParsePatch = maybeJest.fn(parsePatch);
-  
-//   // Replace exports with mockable versions
-//   module.exports = {
-//     ...module.exports,
-//     applyPatch: mockableApplyPatch,
-//     parsePatch: mockableParsePatch
-//   };
-// }

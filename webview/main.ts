@@ -21,6 +21,7 @@ interface FileInfo {
   exists: boolean;
   hunks: number;
   changes: { additions: number; deletions: number };
+  hunkHeadersCorrected?: boolean;
 }
 
 // Result interface
@@ -278,9 +279,11 @@ function handlePatchPreview(
   let totalAdditions = 0;
   let totalDeletions = 0;
   let missingFiles = 0;
+  let correctedHeadersCount = 0;
 
   fileInfo.forEach((file) => {
     if (!file.exists) {missingFiles++;}
+    if (file.hunkHeadersCorrected) {correctedHeadersCount++;}
 
     totalAdditions += file.changes.additions;
     totalDeletions += file.changes.deletions;
@@ -300,6 +303,15 @@ function handlePatchPreview(
     const stats = document.createElement('span');
     stats.className = 'file-stats';
     stats.textContent = `(${file.hunks} hunks, +${file.changes.additions} -${file.changes.deletions})`;
+
+    // Add correction indicator if headers were corrected
+    if (file.hunkHeadersCorrected) {
+      const correctionIndicator = document.createElement('span');
+      correctionIndicator.className = 'correction-indicator';
+      correctionIndicator.textContent = 'ℹ️';
+      correctionIndicator.title = 'Hunk header line counts were automatically corrected';
+      stats.appendChild(correctionIndicator);
+    }
 
     entry.append(icon, pathSpan, stats);
     fileList.appendChild(entry);
@@ -324,19 +336,25 @@ function handlePatchPreview(
   cancelBtn.disabled = false;
   cancelBtn.setAttribute('aria-disabled', 'false');
 
+  // Set status message, including correction info if applicable
+  let statusText = '';
   if (!applyShouldBeEnabled) {
-    setStatus(statusMessage, 'Error: All target files not found. Cannot apply patch.', 'error');
+    statusText = 'Error: All target files not found. Cannot apply patch.';
+    setStatus(statusMessage, statusText, 'error');
     previewBtn.focus();
   } else if (missingFiles > 0) {
-    setStatus(statusMessage,
-      `Ready: ${fileInfo.length - missingFiles} file${fileInfo.length - missingFiles === 1 ? '' : 's'} will be patched; ${missingFiles} missing.`,
-      'warning');
+    statusText = `Ready: ${fileInfo.length - missingFiles} file${fileInfo.length - missingFiles === 1 ? '' : 's'} will be patched; ${missingFiles} missing.`;
+    setStatus(statusMessage, statusText, 'warning');
     applyBtn.focus();
   } else {
-    setStatus(statusMessage,
-      `Ready: ${fileInfo.length} file${fileInfo.length === 1 ? '' : 's'} will be patched.`,
-      'success');
+    statusText = `Ready: ${fileInfo.length} file${fileInfo.length === 1 ? '' : 's'} will be patched.`;
+    setStatus(statusMessage, statusText, 'success');
     applyBtn.focus();
+  }
+  
+  // Add header correction info to status message if applicable
+  if (correctedHeadersCount > 0) {
+    statusMessage.textContent += ` Hunk headers automatically corrected where necessary.`;
   }
 }
 

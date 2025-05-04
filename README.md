@@ -150,12 +150,13 @@ ext install patchpilot.patch-pilot
 
 ## ⚙️ Settings Overview
 
-| Setting | Type | Default | Description |
-|:--------|:-----|:--------|:------------|
-| `patchPilot.autoStage` | boolean | `false` | Auto-stage patched files |
-| `patchPilot.fuzzFactor` | enum (0-3) | `2` | Controls fuzzy matching aggression |
-| `patchPilot.mtimeCheck` | boolean | `true` | Check file modification times |
-| `patchPilot.enableTelemetry` | boolean | `false` | Send minimal anonymous telemetry |
+| Setting                             | Type         | Default | Description                                                                                                                   |
+|:------------------------------------|:-------------|:--------|:------------------------------------------------------------------------------------------------------------------------------|
+| `patchPilot.autoStage`              | boolean      | `false` | Auto-stage patched files                                                                                                      |
+| `patchPilot.autoCorrectHunkHeaders` | boolean      | `true`  | Automatically correct inaccurate line counts found in hunk headers (`@@ ... @@`). Disable if this causes issues.             |
+| `patchPilot.fuzzFactor`             | enum (0-3)   | `2`     | Controls fuzzy matching aggression                                                                                            |
+| `patchPilot.mtimeCheck`             | boolean      | `true`  | Check file modification times                                                                                                 |
+| `patchPilot.enableTelemetry`        | boolean      | `false` | Send minimal anonymous telemetry                                                                                              |
 
 ### ⌨️ Keyboard Shortcuts
 
@@ -210,6 +211,10 @@ git config --global --add safe.directory /your/project/path
 - Ensure the unified diff headers (`diff --git`, `---`, `+++`) use LF (`
 `) endings.
 - PatchPilot normalizes content line endings automatically, but header CRLFs can occasionally impact file matching.
+
+### What does the ℹ️ icon in the Preview mean?
+
+- This indicates that PatchPilot detected and automatically corrected inaccurate line counts in that file's diff hunk headers (@@ ... @@), which often improves the chances of the patch applying correctly, especially for AI-generated diffs. You can disable this via the patchPilot.autoCorrectHunkHeaders setting if needed.
 
 ---
 
