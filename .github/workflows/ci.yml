@@ -112,32 +112,42 @@ jobs:
         id: tag_meta
         shell: bash
         run: |
-          # Get tag message contents
-          TAG_JSON=$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")
-          
-          # Log the raw tag contents for debugging
-          echo "Raw tag contents:"
+          # Get the ACTUAL tag annotation message using 'git tag -n' and filtering
+          # 'git tag -n --format='%(contents)' "$GITHUB_REF_NAME"' is more reliable
+          # for getting the annotation message itself.
+          # We use 'git tag -n1' to get the first line of the annotation, which SHOULD be our JSON.
+          # Fallback to git show if the first method fails.
+          TAG_JSON=$(git tag -n1 --format='%(contents:lines=1)' "$GITHUB_REF_NAME" || git show -s --format=%B "$GITHUB_REF_NAME"^{tag} || echo "")
+
+          echo "Raw content retrieved for tag message:"
+          echo "$TAG_JSON" # Log what was actually retrieved
+
+          # Trim leading/trailing whitespace and potentially quotes added by git show/tag
+          TAG_JSON=$(echo "$TAG_JSON" | sed "s/^'{ //; s/ }'$//; s/^'//" | sed "s/'$//")
+          echo "Trimmed tag content:"
           echo "$TAG_JSON"
-          
+
           # Set default values
           PUBLISH="true"
           TYPE="feature"
-          
-          # Try to parse JSON with error handling
+
           if [[ -n "$TAG_JSON" ]]; then
-            echo "tag_json=$TAG_JSON" >>"$GITHUB_OUTPUT"
+            echo "tag_json=${TAG_JSON}" >>"$GITHUB_OUTPUT" # Store the potentially valid JSON
+            # Validate if it's JSON
             if echo "$TAG_JSON" | jq -e . >/dev/null 2>&1; then
-              # Valid JSON - extract values
+              # Valid JSON - extract values robustly
               PUBLISH=$(jq -r '.PUBLISH_MARKETPLACE // "true"' <<<"$TAG_JSON")
               TYPE=$(jq -r '.RELEASE_TYPE // "feature"' <<<"$TAG_JSON")
-              echo "✅ Successfully parsed tag metadata"
+              echo "✅ Successfully parsed tag metadata from annotation message."
             else
-              echo "⚠️ Tag message is not valid JSON, using default values"
+              echo "⚠️ Tag annotation message retrieved was not valid JSON ('$TAG_JSON'), using default values."
+              echo "tag_json=" >> "$GITHUB_OUTPUT" # Clear output if invalid
             fi
           else
-            echo "⚠️ No tag message found, using default values"
+            echo "⚠️ No tag annotation message found, using default values."
+            echo "tag_json=" >> "$GITHUB_OUTPUT" # Clear output if empty
           fi
-          
+
           # Output the values that will be used
           echo "📊 Publishing to marketplace: $PUBLISH"
           echo "📊 Release type: $TYPE"
