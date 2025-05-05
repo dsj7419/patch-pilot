@@ -392,34 +392,3 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
   }
   return info;
 }
-
-// /* ------------------------------------------------------------------ *
-//  *  Jest shim — active only during unit tests, no `any` leaks
-//  * ------------------------------------------------------------------ */
-// type JestLike = {
-//   fn: <A extends unknown[], R>(impl: (...args: A) => R) => (...args: A) => R;
-// };
-
-// function isJest(obj: unknown): obj is JestLike {
-//   return (
-//     typeof obj === 'object' &&
-//     obj !== null &&
-//     'fn' in obj &&
-//     typeof (obj as Record<string, unknown>).fn === 'function'
-//   );
-// }
-
-// const maybeJest = (globalThis as Record<string, unknown>).jest;
-
-// if (isJest(maybeJest)) {
-//   // Create mockable versions of the functions
-//   const mockableApplyPatch = maybeJest.fn(applyPatch);
-//   const mockableParsePatch = maybeJest.fn(parsePatch);
-  
-//   // Replace exports with mockable versions
-//   module.exports = {
-//     ...module.exports,
-//     applyPatch: mockableApplyPatch,
-//     parsePatch: mockableParsePatch
-//   };
-// }
