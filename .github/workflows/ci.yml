@@ -161,13 +161,12 @@ jobs:
           yarn vsce publish \
             --packagePath "${{ steps.vsix.outputs.vsix }}" \
             -p "${{ secrets.VSCODE_MARKETPLACE_PAT }}"
-
       - name: 🚢 Publish to Open VSX
         if: steps.tag_meta.outputs.publish == 'true'
+        timeout-minutes: 5  # Set timeout at the GitHub Actions level instead
         run: |
           yarn ovsx publish "${{ steps.vsix.outputs.vsix }}" \
-            -p "${{ secrets.OPEN_VSX_PAT }}" \
-            --timeout 300000
+            -p "${{ secrets.OPEN_VSX_PAT }}"
 
       # ────────── compose extra release notes (always sets body output) ──────────
       - name: ✍️ Prepare notes
