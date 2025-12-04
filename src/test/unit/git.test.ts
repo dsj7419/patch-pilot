@@ -1,4 +1,4 @@
-// src/test/unit/gitSecure.test.ts
+// src/test/unit/git.test.ts
 
 import * as vscode from 'vscode';
 import {
@@ -12,7 +12,7 @@ import {
   createCommit,
   getLastCommitFiles,
   GitError,
-} from '../../gitSecure';
+} from '../../git';
 
 // Set up mock flags - even these need to be before jest.mock calls
 let mockDetachedHead = false;

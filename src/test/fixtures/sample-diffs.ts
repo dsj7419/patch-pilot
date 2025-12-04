@@ -16,6 +16,20 @@ export const WELL_FORMED_DIFF = `diff --git a/src/file.ts b/src/file.ts
  import reportWebVitals from './reportWebVitals';
  `;
 
+ /**
+ * A well-formed sample diff with context
+ */
+export const NEW_FOLDER_DIFF = `diff --git a/dev/null b/src/components/NewComponent.tsx
+--- a/dev/null
++++ b/src/components/NewComponent.tsx
+@@ -10,7 +10,7 @@ import React from 'react';
++import ReactDOM from 'react-dom';
++import './index.css';
++import App from './App';
++import { App } from './App';
++import reportWebVitals from './reportWebVitals';
+ `;
+
 /**
  * A missing header diff (common from AI systems)
  */

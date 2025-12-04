@@ -52,3 +52,9 @@ performance-results.json
 enhanced-benchmark-results.json
 large-diff-benchmark-results.json
 benchmark-report.json
+
+# yek
+.merge/
+yek.yaml
+
+todo.md

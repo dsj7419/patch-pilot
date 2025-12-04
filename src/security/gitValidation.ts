@@ -2,6 +2,7 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { isSafePath } from './pathSanitizer';
 
 /**
  * Validates if a string is a safe Git branch name
@@ -126,57 +127,23 @@ export function sanitizeBranchName(name: string): string {
  * @returns True if the path is valid and within the workspace
  */
 export function isValidFilePath(filePath: string, workspacePath: string): boolean {
-    if (!filePath || typeof filePath !== 'string' || !workspacePath || typeof workspacePath !== 'string') {
-      return false;
-    }
-    
-    try {
-      // Check for null bytes which can cause string termination issues
-      if (filePath.includes('\0')) {
-        return false;
-      }
-      
-      // Check for extremely long paths that might cause issues
-      if (filePath.length > 1000) {
-        return false;
-      }
-      
-      // Special case handling for absolute paths
-      if (path.isAbsolute(filePath)) {
-        // For absolute paths, we must explicitly reject them
-        // Absolute paths are generally a security risk in this context
-        return false;
-      }
-      
-      // Detect paths trying to escape the workspace with relative navigation
-      const normalizedPath = path.normalize(filePath);
-      
-      // Check for path traversal attempts
-      if (normalizedPath.includes('..')) {
-        return false;
-      }
-      
-      // Catch Windows path traversal or absolute paths
-      if (normalizedPath.includes(':') || normalizedPath.startsWith('\\\\')) {
-        return false;
-      }
-      
-      // Additional safety checks for malicious patterns
-      if (/\\\\|\/\/|\.\.\/|~\/|\$|%|&|\||;|>|<|`|\(|\)|\{|\}|\[|\]/.test(normalizedPath)) {
-        return false;
-      }
-      
-      // Check for control characters
-      if (/[\0-\x1F]/.test(normalizedPath)) {
-        return false;
-      }
-      
-      return true;
-    } catch (_err) {
-      // Any path manipulation errors indicate an invalid path
-      return false;
-    }
+  if (!filePath || typeof filePath !== 'string' || !workspacePath || typeof workspacePath !== 'string') {
+    return false;
   }
+  
+  // Use centralized path validation
+  if (!isSafePath(filePath)) {
+    return false;
+  }
+  
+  // Additional Git-specific checks if needed (e.g. specific characters allowed in git but not generally safe)
+  // For now, we also check for some shell-unsafe characters that might be passed to git CLI
+  if (/[\$|&;<>`(){}\[\]]/.test(filePath)) {
+    return false;
+  }
+  
+  return true;
+}
 
 /**
  * Validates and sanitizes an array of file paths for Git operations

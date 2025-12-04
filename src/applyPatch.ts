@@ -3,9 +3,9 @@
  * ----------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-import * as DiffLib from 'diff';
-import { normalizeDiff } from './utilities';
-import { autoStageFiles } from './gitSecure';
+import { normalizeDiff, normalizeLineEndings } from './utilities';
+import { autoStageFiles } from './git';
+import { getOutputChannel } from './logger';
 import { trackEvent } from './telemetry';
 import {
   PatchStrategyFactory,
@@ -18,11 +18,13 @@ import {
   DiffParsedPatch,
 } from './types/patchTypes';
 import { useOptimizedStrategies } from './strategies/optimizedPatchStrategy';
+import { parsePatch as parsePatchInternal, extractFilePath, resolveWorkspaceFile } from './patch/PatchParser';
+import { addToPatchQueue, processNextPatch, clearPatchQueue } from './patch/PatchSession';
 
 /* ────────────────────── Multi‑file entry point ─────────────────────────── */
 
 export async function applyPatch(
-  patchText: string,
+  patchInput: string | DiffParsedPatch[],
   opts: ApplyOptions = {},
 ): Promise<ApplyResult[]> {
   trackEvent('apply_patch_start', { preview: opts.preview ?? true });
@@ -33,48 +35,65 @@ export async function applyPatch(
   const preview = opts.preview ?? true;
   const mtimeCheck = opts.mtimeCheck ?? cfg.get('mtimeCheck', true);
 
-  const canonical = normalizeDiff(patchText);
-  const patches = DiffLib.parsePatch(canonical) as DiffParsedPatch[];
+  let patches: DiffParsedPatch[];
+  if (typeof patchInput === 'string') {
+    const canonical = normalizeDiff(patchInput);
+    patches = parsePatchInternal(canonical);
+  } else {
+    patches = patchInput;
+  }
+
   if (patches.length === 0) {
     throw new Error('No valid patches found in the provided text.');
   }
 
   const results: ApplyResult[] = [];
   const staged: string[] = [];
+  
+  // Clear queue at start of new operation
+  clearPatchQueue();
 
   for (const patch of patches) {
     const relPath = extractFilePath(patch) ?? 'unknown-file';
 
     try {
-      const fileUri = await resolveWorkspaceFile(relPath);
-      if (!fileUri) {
-        results.push({
-          file: relPath,
-          status: 'failed',
-          reason: 'File not found in workspace',
-        });
-        continue;
-      }
+      const isNewFileFromPatch = patch.oldFileName === '/dev/null';
+      const { uri: fileUri, isNew } = await resolveWorkspaceFile(relPath, isNewFileFromPatch);
+      console.debug(`[DEBUG] File: ${relPath}, isNew: ${isNew}, URI: ${fileUri.toString()}`);
 
       // Record file stats before reading to detect external changes
       let fileStats: vscode.FileStat | undefined;
-      if (mtimeCheck) {
+      if (mtimeCheck && !isNew) {
         try {
           fileStats = await vscode.workspace.fs.stat(fileUri);
         } catch (_err) {
           // If stat fails, continue anyway but without mtime check
-          const output = vscode.window.createOutputChannel('PatchPilot');
-          output.appendLine(`Could not get file stats for ${relPath}, skipping mtime check`);
+          getOutputChannel().appendLine(`Could not get file stats for ${relPath}, skipping mtime check`);
         }
       }
 
-      const doc = await vscode.workspace.openTextDocument(fileUri);
-      const original = doc.getText();
+      let original = '';
+      let originalEOL = '\n';
+      if (!isNew) {
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        original = doc.getText();
+        if (original.includes('\r\n')) {
+          originalEOL = '\r\n';
+        }
+        original = normalizeLineEndings(original); // Normalize to LF for patching
+      }
+
       const { patched, success, strategy } = await applyPatchToContent(
         original,
         patch,
         fuzz,
       );
+
+      // Restore original EOL if needed
+      let finalPatched = patched;
+      if (originalEOL === '\r\n') {
+        finalPatched = patched.replaceAll(/\n/g, '\r\n');
+      }
 
       if (!success) {
         results.push({
@@ -86,29 +105,28 @@ export async function applyPatch(
       }
 
       if (preview) {
-        const confirmed = await showPatchPreview(
+        // Add to queue instead of showing immediately
+        addToPatchQueue({
           fileUri,
           original,
-          patched,
+          patched: finalPatched,
           relPath,
-        );
-        if (!confirmed) {
-          results.push({
-            file: relPath,
-            status: 'failed',
-            reason: 'User cancelled after preview',
-          });
-          continue;
-        }
+          isNew,
+          autoStage,
+          strategy: strategy || 'preview'
+        });
+        
+        // Mark as 'applied' in terms of "successfully processed", waiting for user acceptance
+        results.push({ file: relPath, status: 'applied', strategy: strategy || 'preview' });
+        continue;
       }
 
       // Check if file was modified externally while we were working
-      if (mtimeCheck && fileStats) {
+      if (mtimeCheck && fileStats && !isNew) {
         try {
           const currentStats = await vscode.workspace.fs.stat(fileUri);
           
-          // Compare mtimes directly - in VS Code API these are numbers 
-          // (milliseconds since epoch)
+          // Compare mtimes directly
           if (fileStats.mtime !== currentStats.mtime) {
             const confirmOverwrite = await vscode.window.showWarningMessage(
               `File ${relPath} has been modified since reading it. Apply patch anyway?`,
@@ -127,24 +145,35 @@ export async function applyPatch(
             }
           }
         } catch (_err) {
-          // If stat fails at this point, continue but log warning
-          const output = vscode.window.createOutputChannel('PatchPilot');
-          output.appendLine(`Could not verify file stats for ${relPath}`);
+          getOutputChannel().appendLine(`Could not verify file stats for ${relPath}`);
         }
       }
 
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(fileUri, fullDocRange(doc), patched);
-      if (!(await vscode.workspace.applyEdit(edit))) {
-        results.push({
-          file: relPath,
-          status: 'failed',
-          reason: 'Workspace edit failed',
-        });
-        continue;
+      if (isNew) {
+        console.debug(`[DEBUG] Creating directory for new file: ${fileUri.fsPath}`);
+        // Ensure parent directory exists before writing file
+        const parentDir = vscode.Uri.joinPath(fileUri, '..');
+        await vscode.workspace.fs.createDirectory(parentDir);
+        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(finalPatched));
+      } else {
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        const edit = new vscode.WorkspaceEdit();
+        edit.replace(fileUri, fullDocRange(doc), finalPatched);
+        if (!(await vscode.workspace.applyEdit(edit))) {
+          results.push({
+            file: relPath,
+            status: 'failed',
+            reason: 'Workspace edit failed',
+          });
+          continue;
+        }
       }
 
-      if (doc.isDirty) {await doc.save();}
+      if (!isNew) {
+        const doc = await vscode.workspace.openTextDocument(fileUri);
+        if (doc.isDirty) {await doc.save();}
+      }
+      
       results.push({ file: relPath, status: 'applied', strategy });
       if (autoStage) {staged.push(relPath);}
     } catch (err) {
@@ -154,6 +183,11 @@ export async function applyPatch(
         reason: (err as Error).message ?? String(err),
       });
     }
+  }
+  
+  // Start processing the queue if we have items
+  if (results.some(r => r.status === 'applied' && (r.strategy === 'preview' || opts.preview))) {
+    await processNextPatch();
   }
 
   if (autoStage && staged.length) {
@@ -214,142 +248,31 @@ export async function applyPatchToContent(
   }
 }
 
-/* ───────────────────────── Preview diff editor ─────────────────────────── */
-
-async function showPatchPreview(
-  fileUri: vscode.Uri,
-  original: string,
-  patched: string,
-  relPath: string,
-): Promise<boolean> {
-  const left = fileUri.with({
-    scheme: 'patchpilot-orig',
-    query: fileUri.toString(),
-  });
-  const right = fileUri.with({
-    scheme: 'patchpilot-mod',
-    query: fileUri.toString(),
-  });
-
-  const origProvider = vscode.workspace.registerTextDocumentContentProvider(
-    'patchpilot-orig',
-    { provideTextDocumentContent: (u) => (u.query === fileUri.toString() ? original : '') },
-  );
-  const modProvider = vscode.workspace.registerTextDocumentContentProvider(
-    'patchpilot-mod',
-    { provideTextDocumentContent: (u) => (u.query === fileUri.toString() ? patched : '') },
-  );
-
-  try {
-    await vscode.commands.executeCommand(
-      'vscode.diff',
-      left,
-      right,
-      `Patch Preview – ${relPath}`,
-    );
-    const choice = await vscode.window.showInformationMessage(
-      `Apply patch to ${relPath}?`,
-      { modal: true },
-      'Apply',
-    );
-    return choice === 'Apply';
-  } finally {
-    origProvider.dispose();
-    modProvider.dispose();
-  }
-}
-
-/* ─────────────────────────── Utility helpers ───────────────────────────── */
-
-export function extractFilePath(p: DiffParsedPatch): string | undefined {
-  if (p.newFileName && p.newFileName !== '/dev/null') {
-    // Clean both actual control characters and escaped character sequences
-    return p.newFileName.replace(/^b\//, '')
-      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
-      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
-      .trim();
-  }
-  if (p.oldFileName && p.oldFileName !== '/dev/null') {
-    // Clean both actual control characters and escaped character sequences
-    return p.oldFileName.replace(/^a\//, '')
-      .replace(/[\x00-\x1F\x7F]+/g, '') // Remove actual control characters
-      .replace(/\\r|\\n/g, '')          // Remove escaped \r and \n sequences
-      .trim();
-  }
-  return undefined;
-}
-
-async function resolveWorkspaceFile(
-  relPath: string,
-): Promise<vscode.Uri | undefined> {
-  const roots = vscode.workspace.workspaceFolders;
-  if (!roots?.length) {throw new Error('No workspace folder open.');}
-
-  // Security improvement: Validate the relative path
-  if (!relPath || relPath.includes('..') || relPath.startsWith('/')) {
-    throw new Error(`Invalid file path: ${relPath}`);
-  }
-
-  // Try each workspace folder
-  for (const r of roots) {
-    const uri = vscode.Uri.joinPath(r.uri, relPath);
-    try {
-      await vscode.workspace.fs.stat(uri);
-      return uri;
-    } catch {
-      /* ignore */
-    }
-  }
-
-  // If not found directly, try finding by filename
-  const fname = relPath.split('/').pop() ?? relPath;
-  if (!fname || fname === '' || fname === '..' || fname === '.') {
-    return undefined;
-  }
-
-  const found = await vscode.workspace.findFiles(
-    `**/${fname}`,
-    '**/node_modules/**',
-    10 // Limit results to avoid performance issues
-  );
-
-  if (found.length === 1) {return found[0];}
-  if (found.length > 1) {
-    // Get stats for each found file
-    const filesWithStats = [];
-    for (const f of found) {
-      const stats = await vscode.workspace.fs.stat(f);
-      filesWithStats.push({
-        label: vscode.workspace.asRelativePath(f),
-        uri: f,
-        description: `Last modified: ${new Date(stats.mtime).toLocaleString()}`
-      });
-    }
-    
-    const pick = await vscode.window.showQuickPick(
-      filesWithStats,
-      {
-        placeHolder: `Select file for patch «${relPath}»`,
-        title: "Multiple files match the patch target"
-      },
-    );
-    return pick?.uri;
-  }
-  return undefined;
-}
-
 function fullDocRange(doc: vscode.TextDocument): vscode.Range {
   const lastLine = doc.lineCount - 1;
   return new vscode.Range(0, 0, lastLine, doc.lineAt(lastLine).text.length);
 }
+/* ───────────────────── Parsing helpers ─────────────────────────────────── */
+
+export function parseUnifiedDiff(patchText: string): DiffParsedPatch[] {
+  const canonical = normalizeDiff(patchText);
+  return parsePatchInternal(canonical);
+}
+
+// Re-export parsePatch for backward compatibility with tests/extensions
+export { parsePatchInternal as parsePatch };
+
 
 /* ───────────────────── Parse‑only helper for WebView ───────────────────── */
 
-export async function parsePatch(patchText: string): Promise<FileInfo[]> {
-  const cleanPatchText = patchText.replace(/\\r\\n|\\r|\\n/g, '');
-  
-  const normalized = normalizeDiff(cleanPatchText);
-  const patches = DiffLib.parsePatch(normalized) as DiffParsedPatch[];
+export async function parsePatchStats(patchInput: string | DiffParsedPatch[]): Promise<FileInfo[]> {
+  let patches: DiffParsedPatch[];
+  if (typeof patchInput === 'string') {
+    const normalized = normalizeDiff(patchInput);
+    patches = parsePatchInternal(normalized);
+  } else {
+    patches = patchInput;
+  }
 
   const info: FileInfo[] = [];
 
@@ -364,8 +287,9 @@ export async function parsePatch(patchText: string): Promise<FileInfo[]> {
     if (filePathMap.has(path)) {continue;}
     
     // Check if file exists
-    const uri = await resolveWorkspaceFile(path);
-    filePathMap.set(path, !!uri);
+    const isNewFileFromPatch = p.oldFileName === '/dev/null';
+    const { isNew } = await resolveWorkspaceFile(path, isNewFileFromPatch);
+    filePathMap.set(path, !isNew); // `!isNew` correctly indicates if the file exists
   }
 
   // Now process each patch with the pre-checked file existence status

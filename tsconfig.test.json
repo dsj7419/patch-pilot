@@ -4,14 +4,15 @@
       "types": ["jest", "node", "vscode"],
       "module": "commonjs",
       "target": "ES2020",
-      "lib": ["ES2020", "ES2022.Intl", "DOM"],
+      "lib": ["ES2020", "ES2022.Intl", "ES2021.String", "DOM"],
       "sourceMap": true,
       "strict": true,
       "esModuleInterop": true,
       "resolveJsonModule": true,
       "forceConsistentCasingInFileNames": true,
       "skipLibCheck": true,
-      "noImplicitAny": false
+      "noImplicitAny": false,
+      "isolatedModules": true
     },
     "include": [
       "src/**/*.ts",

@@ -290,8 +290,9 @@ function handlePatchPreview(
     entry.setAttribute('role', 'listitem');
 
     const icon = document.createElement('span');
+    // Use emoji for status indicators to avoid CSP issues with fonts
     icon.className = `file-icon ${file.exists ? 'success-icon' : 'warning-icon'}`;
-    icon.textContent = file.exists ? '✓' : '⚠️';
+    icon.textContent = file.exists ? '✅' : '➕';
 
     const pathSpan = document.createElement('span');
     pathSpan.className = 'file-path';
@@ -312,7 +313,8 @@ function handlePatchPreview(
   fileList.appendChild(summary);
 
   // Enable/disable apply button
-  const applyShouldBeEnabled = fileInfo.some(f => f.exists); // at least one file can be patched
+  // Allow apply if there are any files (existing or new)
+  const applyShouldBeEnabled = fileInfo.length > 0;
   applyBtn.disabled = !applyShouldBeEnabled;
   applyBtn.setAttribute('aria-disabled', applyShouldBeEnabled ? 'false' : 'true');
 
@@ -324,12 +326,12 @@ function handlePatchPreview(
   cancelBtn.disabled = false;
   cancelBtn.setAttribute('aria-disabled', 'false');
 
-  if (!applyShouldBeEnabled) {
+  if (fileInfo.length === 0) {
     setStatus(statusMessage, 'Error: All target files not found. Cannot apply patch.', 'error');
     previewBtn.focus();
   } else if (missingFiles > 0) {
     setStatus(statusMessage,
-      `Ready: ${fileInfo.length - missingFiles} file${fileInfo.length - missingFiles === 1 ? '' : 's'} will be patched; ${missingFiles} missing.`,
+      `Ready: ${fileInfo.length} file${fileInfo.length === 1 ? '' : 's'} to patch (${missingFiles} new or not found).`,
       'warning');
     applyBtn.focus();
   } else {

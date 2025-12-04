@@ -12,9 +12,18 @@ declare module 'diff' {
   }
 
   export interface ParsedPatch {
-    oldFileName?: string;
-    newFileName?: string;
+    oldFileName: string;
+    newFileName: string;
+    oldHeader: string;
+    newHeader: string;
     hunks: Hunk[];
+  }
+
+  export interface Change {
+    value: string;
+    count?: number;
+    added?: boolean;
+    removed?: boolean;
   }
 
   // Function to build diff programmatically
@@ -31,4 +40,5 @@ declare module 'diff' {
   // Functions from the diff library that we use
   export function parsePatch(text: string): ParsedPatch[];
   export function applyPatch(content: string, patch: string | ParsedPatch): string | false;
+  export function diffLines(oldStr: string, newStr: string, options?: any): Change[];
 }

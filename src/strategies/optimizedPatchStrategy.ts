@@ -25,23 +25,8 @@ export class OptimizedGreedyStrategy implements PatchStrategy {
   readonly name = 'optimized-greedy';
   
   apply(content: string, patch: DiffParsedPatch): PatchResult {
-    // Special test-only implementation
-    if (typeof jest !== 'undefined') {
-      // Call applyPatch twice for test coverage
-      DiffLib.applyPatch(content, patch);
-      DiffLib.applyPatch(content, this.clonePatch(patch));
-      
-      // Return what test expects
-      return {
-        patched: 'patched content',
-        success: true,
-        strategy: this.name
-      };
-    }
-    
-    // Normal implementation
     const copy = this.clonePatch(patch);
-    const fileLines = content.split('\n');
+    const fileLines = content.split(/\r?\n/);
     
     // Build efficient line index
     const lineIndex = this.buildLineIndex(fileLines);
@@ -68,6 +53,8 @@ export class OptimizedGreedyStrategy implements PatchStrategy {
     return {
       oldFileName: patch.oldFileName,
       newFileName: patch.newFileName,
+      oldHeader: patch.oldHeader,
+      newHeader: patch.newHeader,
       hunks: patch.hunks.map(hunk => ({
         oldStart: hunk.oldStart,
         oldLines: hunk.oldLines,
@@ -270,6 +257,8 @@ export class OptimizedChainedStrategy implements PatchStrategy {
     return {
       oldFileName: patch.oldFileName,
       newFileName: patch.newFileName,
+      oldHeader: patch.oldHeader,
+      newHeader: patch.newHeader,
       hunks: patch.hunks.map(hunk => ({
         oldStart: hunk.oldStart,
         oldLines: hunk.oldLines,

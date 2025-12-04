@@ -25,9 +25,8 @@ import {
     applyPatch: jest.fn((content, patch) => {
       // For the non-matching context test
       if (patch?.hunks?.[0]?.lines?.some(line => line === ' This context line does not exist in source')) {
-        // First call fails (unoptimized patch), second call succeeds (after optimization)
-        const callCount = (jest.mocked(DiffLib.applyPatch).mock.calls.length);
-        return callCount === 1 ? false : 'patched content';
+        // If the bad line is still present, the optimization failed (or hasn't run)
+        return false;
       }
       
       // Mock for specific test - patch with non-matching context
@@ -60,8 +59,7 @@ import {
         
         // Mock to return successful patch on second attempt after optimization
         (DiffLib.applyPatch as jest.Mock)
-          .mockReturnValueOnce(false) // First attempt fails (unmodified patch)
-          .mockReturnValueOnce('patched content'); // Second attempt succeeds (after optimization)
+          .mockReturnValue('patched content');
         
         // Create a patch with context lines that won't match
         const patch = createMockParsedPatch({

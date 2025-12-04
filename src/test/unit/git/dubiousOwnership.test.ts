@@ -1,4 +1,4 @@
-// src/test/unit/gitSecure/dubiousOwnership.test.ts
+// src/test/unit/git/dubiousOwnership.test.ts
 
 import * as vscode from 'vscode';
 import {
@@ -8,7 +8,7 @@ import {
   createCommit,
   getLastCommitFiles,
   GitError
-} from '../../../gitSecure';
+} from '../../../git';
 
 // Mock vscode
 jest.mock('vscode');
@@ -43,6 +43,13 @@ jest.mock('simple-git', () => {
 });
 
 // Mock telemetry
+// Mock logger
+jest.mock('../../../logger', () => ({
+  getGitOutputChannel: jest.fn(),
+  getMainOutputChannel: jest.fn(),
+  log: jest.fn()
+}));
+
 jest.mock('../../../telemetry', () => ({
   trackEvent: jest.fn()
 }));
@@ -56,8 +63,15 @@ jest.mock('../../../security/gitValidation', () => ({
   sanitizeCommitMessage: jest.fn(msg => msg)
 }));
 
+// Mock logger
+jest.mock('../../../logger', () => ({
+  getGitOutputChannel: jest.fn(),
+  getMainOutputChannel: jest.fn(),
+  log: jest.fn()
+}));
+
 // Helper to set up workspace folders for tests
-function setupWorkspaceFolders(exists: boolean = true) {
+function setupWorkspaceFolders(exists: boolean = true, outputChannel?: any) {
   if (exists) {
     // Set up workspace folders
     (vscode.workspace as any).workspaceFolders = [
@@ -66,6 +80,12 @@ function setupWorkspaceFolders(exists: boolean = true) {
   } else {
     // Remove workspace folders
     (vscode.workspace as any).workspaceFolders = undefined;
+    
+    // Setup logger mock
+    const logger = require('../../../logger');
+    if (outputChannel) {
+      logger.getGitOutputChannel.mockReturnValue(outputChannel);
+    }
   }
 }
 
@@ -76,7 +96,7 @@ describe('Dubious Ownership Error Handling', () => {
     jest.clearAllMocks();
     
     // Set up workspace folders
-    setupWorkspaceFolders(true);
+    setupWorkspaceFolders(true, mockOutputChannel);
     
     // Create mock output channel
     mockOutputChannel = {
@@ -90,6 +110,10 @@ describe('Dubious Ownership Error Handling', () => {
     
     // Mock the showErrorMessage function
     (vscode.window.showErrorMessage as jest.Mock).mockResolvedValue('OK');
+    
+    // Setup logger mock
+    const logger = require('../../../logger');
+    logger.getGitOutputChannel.mockReturnValue(mockOutputChannel);
   });
 
   describe('handleDubiousOwnershipError', () => {
@@ -172,7 +196,7 @@ describe('Dubious Ownership Error Handling', () => {
     
     test('should not show error message when no workspace folders exist', async () => {
       // Remove workspace folders
-      setupWorkspaceFolders(false);
+      setupWorkspaceFolders(false, mockOutputChannel);
       
       // Try to auto-stage files, which should throw a different error
       await expect(autoStageFiles(['file.txt'])).rejects.toThrow('No workspace folder open');

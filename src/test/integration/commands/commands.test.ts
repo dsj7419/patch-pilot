@@ -2,12 +2,11 @@
 import * as vscode from 'vscode';
 import { activate } from '../../../extension';
 import { PatchPanel } from '../../../PatchPanel';
-import { applyPatch, parsePatch } from '../../../applyPatch';
+import { applyPatch, parsePatchStats } from '../../../applyPatch';
 import { createTempBranch } from '../../../git';
 import { WELL_FORMED_DIFF } from '../../fixtures/sample-diffs';
 
 // Mock dependencies
-jest.mock('vscode');
 jest.mock('../../../PatchPanel');
 jest.mock('../../../applyPatch');
 jest.mock('../../../git');
@@ -181,6 +180,12 @@ describe('Extension Commands', () => {
       // Verify status bar item is created
       expect(vscode.window.createStatusBarItem).toHaveBeenCalled();
       
+      // Verify CodeLens provider is registered
+      expect(vscode.languages.registerCodeLensProvider).toHaveBeenCalledWith(
+        { scheme: 'patchpilot-mod', language: '*' },
+        expect.any(Object)
+      );
+      
       // Verify all disposables are added to subscriptions
       expect(context.subscriptions.length).toBeGreaterThan(0);
     });
@@ -232,8 +237,8 @@ describe('Extension Commands', () => {
 
   describe('parsePatch Command', () => {
     it('should call parsePatch with provided text', async () => {
-      // Setup parsePatch mock
-      (parsePatch as jest.Mock).mockResolvedValue([
+      // Setup parsePatchStats mock
+      (parsePatchStats as jest.Mock).mockResolvedValue([
         { filePath: 'file.ts', exists: true, hunks: 1, changes: { additions: 1, deletions: 1 } }
       ]);
       
@@ -248,7 +253,7 @@ describe('Extension Commands', () => {
       const result = await parsePatchHandler(WELL_FORMED_DIFF);
       
       // Verify parsePatch was called with correct arguments
-      expect(parsePatch).toHaveBeenCalledWith(WELL_FORMED_DIFF);
+      expect(parsePatchStats).toHaveBeenCalledWith(WELL_FORMED_DIFF);
       
       // Verify result is returned
       expect(result).toEqual([

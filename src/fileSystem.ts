@@ -1,6 +1,7 @@
 // src/fileSystem.ts
 
 import * as vscode from 'vscode';
+import { getMainOutputChannel } from './logger';
 
 /**
  * Options for file modification check
@@ -40,10 +41,7 @@ export interface FileModificationResult {
  */
 function logToVSCode(message: string): void {
   try {
-    const output = vscode.window.createOutputChannel('PatchPilot');
-    if (output && output.appendLine) {
-      output.appendLine(message);
-    }
+    getMainOutputChannel().appendLine(message);
   } catch (_e) {
     // Silently fail if VS Code API is not available
   }

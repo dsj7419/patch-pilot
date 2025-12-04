@@ -6,7 +6,7 @@ jest.setTimeout(15000);
 import * as vscodeTypes from 'vscode';
 
 // Mock VS Code API since we can't import it directly in tests
-const mockVSCode = {
+const mockVSCode: any = {
   // VS Code enums
   ExtensionKind: {
     UI: 1,
@@ -140,6 +140,14 @@ const mockVSCode = {
     }
   },
 
+  CodeLens: class {
+    constructor(range: any, command?: any) {
+      this.range = range;
+      this.command = command;
+    }
+    isResolved = true;
+  },
+
   Uri: {
     file: jest.fn((path) => {
       const uri = {
@@ -202,7 +210,7 @@ const mockVSCode = {
         toString: jest.fn(() => uriString)
       };
     }),
-    joinPath: jest.fn((baseUri, ...pathSegments) => {
+    joinPath: jest.fn((baseUri, ...pathSegments): any => {
       // Get the base path, handling the case where baseUri could be a string or URI object
       const basePath = typeof baseUri === 'string' 
         ? baseUri 
@@ -347,6 +355,7 @@ const mockVSCode = {
     fs: {
       readFile: jest.fn(() => Promise.resolve(Buffer.from(''))),
       writeFile: jest.fn(() => Promise.resolve()),
+      createDirectory: jest.fn(() => Promise.resolve()),
       stat: jest.fn(() => Promise.resolve({ type: 1 }))
     },
     asRelativePath: jest.fn(p => typeof p === 'string' ? p : p.fsPath || ''),
@@ -355,13 +364,18 @@ const mockVSCode = {
       onDidCreate: jest.fn(() => ({ dispose: jest.fn() })),
       onDidDelete: jest.fn(() => ({ dispose: jest.fn() })),
       dispose: jest.fn()
-    }))
+    })),
+    onDidCloseTextDocument: jest.fn(() => ({ dispose: jest.fn() }))
   },
 
   commands: {
     registerCommand: jest.fn(() => ({ dispose: jest.fn() })),
     executeCommand: jest.fn(),
     getCommands: jest.fn(() => Promise.resolve([]))
+  },
+
+  languages: {
+    registerCodeLensProvider: jest.fn(() => ({ dispose: jest.fn() }))
   },
 
   extensions: {

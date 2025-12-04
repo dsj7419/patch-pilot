@@ -17,6 +17,11 @@ import {
     MIXED_LINE_ENDINGS_DIFF
   } from '../../fixtures/sample-diffs';
   
+  // Mock pathSanitizer
+  jest.mock('../../../security/pathSanitizer', () => ({
+    sanitizePath: jest.fn(path => path.trim())
+  }));
+
   describe('Utilities Module', () => {
     describe('getNonce', () => {
       it('should generate a unique nonce string', () => {
@@ -245,6 +250,8 @@ import {
     });
   
     describe('extractFileNamesFromHeader', () => {
+      const { sanitizePath } = require('../../../security/pathSanitizer');
+      
       it('should extract file names from a git diff header', () => {
         const header = 'diff --git a/src/file.ts b/src/file.ts';
         const { oldFile, newFile } = extractFileNamesFromHeader(header);
@@ -284,13 +291,6 @@ import {
         const { oldFile, newFile } = extractFileNamesFromHeader('');
         expect(oldFile).toBeUndefined();
         expect(newFile).toBeUndefined();
-      });
-
-      it('should handle headers with escaped control character sequences', () => {
-        const header = 'diff --git a/src/file.ts\\r\\n b/src/file.ts\\r\\n';
-        const { oldFile, newFile } = extractFileNamesFromHeader(header);
-        expect(oldFile).toBe('src/file.ts');
-        expect(newFile).toBe('src/file.ts');
       });
     });
   

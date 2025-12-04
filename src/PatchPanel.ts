@@ -3,8 +3,9 @@
  * ----------------------------------------------------------------------- */
 
 import * as vscode from 'vscode';
-import { applyPatch, parsePatch } from './applyPatch';
+import { applyPatch, parsePatchStats, parseUnifiedDiff } from './applyPatch';
 import { getNonce, isUnifiedDiff } from './utilities';
+import { getMainOutputChannel } from './logger';
 import { trackEvent } from './telemetry';
 import { ApplyResult, FileInfo } from './types/patchTypes';
 
@@ -40,8 +41,9 @@ export class PatchPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
-  private _outputChannel: vscode.OutputChannel;
   
+  private _cachedPatchText: string = '';
+  private _cachedParsedPatch: any[] | undefined;
   /**
    * Creates or shows the patch panel
    */
@@ -88,7 +90,6 @@ export class PatchPanel {
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this._panel = panel;
     this._extensionUri = extensionUri;
-    this._outputChannel = vscode.window.createOutputChannel('PatchPilot');
     
     this._update();
     
@@ -103,7 +104,7 @@ export class PatchPanel {
     this._panel.webview.onDidReceiveMessage(
       async (message: WebviewMessage) => {
         try {
-          this._outputChannel.appendLine(`Received message: ${JSON.stringify(message)}`);
+          getMainOutputChannel().appendLine(`Received message: ${JSON.stringify(message)}`);
           
           switch (message.command) {
             case 'applyPatch':
@@ -122,10 +123,10 @@ export class PatchPanel {
               await this._handleCheckClipboard();
               break;
             default:
-              this._outputChannel.appendLine(`Unknown message command: ${message.command}`);
+              getMainOutputChannel().appendLine(`Unknown message command: ${message.command}`);
           }
         } catch (error) {
-          this._outputChannel.appendLine(`Error handling message: ${error instanceof Error ? error.message : String(error)}`);
+          getMainOutputChannel().appendLine(`Error handling message: ${error instanceof Error ? error.message : String(error)}`);
           vscode.window.showErrorMessage(`Operation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       },
@@ -171,7 +172,16 @@ export class PatchPanel {
     const fuzz = config.get<number>('fuzzFactor', 2);
     
     try {
-      const results = await applyPatch(patchText, {
+    
+    // Use cached patch if available and text matches
+    let patchToApply: string | any[] = patchText;
+    if (this._cachedParsedPatch && this._cachedPatchText === patchText) {
+      patchToApply = this._cachedParsedPatch;
+      getMainOutputChannel().appendLine('Using cached parsed patch for application');
+    }
+      const results = await applyPatch(patchToApply, {
+      // Clear cache after successful application (or keep it? usually safe to keep until input changes)
+      
         preview: true,
         autoStage,
         fuzz: fuzz as 0|1|2|3
@@ -181,19 +191,25 @@ export class PatchPanel {
       const failCount = results.length - successCount;
       
       if (failCount === 0) {
-        vscode.window.showInformationMessage(`Successfully applied patches to ${successCount} file(s).`);
+        const isPreview = results.some(r => r.strategy === 'preview');
+        if (isPreview) {
+          vscode.window.showInformationMessage(`Patch prepared. Review changes in the diff editor.`);
+        } else {
+          vscode.window.showInformationMessage(`Patch applied to ${successCount} file(s) (Direct mode).`);
+        }
       } else {
         vscode.window.showWarningMessage(`Applied ${successCount} patch(es), ${failCount} failed. Check output for details.`);
         
-        this._outputChannel.appendLine(`--- PatchPilot Results (${new Date().toLocaleString()}) ---`);
+        const output = getMainOutputChannel();
+        output.appendLine(`--- PatchPilot Results (${new Date().toLocaleString()}) ---`);
         results.forEach((result: ApplyResult) => {
           if (result.status === 'failed') {
-            this._outputChannel.appendLine(`❌ ${result.file}: ${result.reason || 'Unknown error'}`);
+            output.appendLine(`❌ ${result.file}: ${result.reason || 'Unknown error'}`);
           } else {
-            this._outputChannel.appendLine(`✅ ${result.file} (${result.strategy || 'unknown strategy'})`);
+            output.appendLine(`✅ ${result.file} (${result.strategy || 'unknown strategy'})`);
           }
         });
-        this._outputChannel.show();
+        output.show();
       }
       
       trackEvent('patch_applied', { 
@@ -238,7 +254,12 @@ export class PatchPanel {
     }
     
     try {
-      const fileInfo = await parsePatch(patchText);
+      // Parse and cache
+      const parsedPatch = parseUnifiedDiff(patchText);
+      this._cachedPatchText = patchText;
+      this._cachedParsedPatch = parsedPatch;
+
+      const fileInfo = await parsePatchStats(parsedPatch);
       
       if (fileInfo.length === 0) {
         vscode.window.showWarningMessage('No valid files found in the patch');
@@ -291,7 +312,7 @@ export class PatchPanel {
         trackEvent('clipboard_check', { containsDiff: false });
       }
     } catch (err) {
-      this._outputChannel.appendLine(`Error reading clipboard: ${err instanceof Error ? err.message : String(err)}`);
+      getMainOutputChannel().appendLine(`Error reading clipboard: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   

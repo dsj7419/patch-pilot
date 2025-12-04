@@ -276,7 +276,7 @@ export function generateLargeDiff(
     
     try {
       // Generate a synthetic patch
-      genPatch = DiffLib.structuredPatch(
+      const structuredPatch = DiffLib.structuredPatch(
         'a/source.ts',
         'b/source.ts',
         source,
@@ -285,6 +285,8 @@ export function generateLargeDiff(
         '',
         { context: Math.ceil(contextRatio * 10) } // Context lines based on ratio
       );
+
+      genPatch = { ...structuredPatch, oldHeader: structuredPatch.oldHeader ?? '', newHeader: structuredPatch.newHeader ?? '' };
       
       // If we need to simulate line shifts
       if (shifts > 0 && genPatch.hunks.length > 0) {
@@ -310,6 +312,8 @@ export function generateLargeDiff(
       genPatch = {
         oldFileName: 'a/source.ts',
         newFileName: 'b/source.ts',
+        oldHeader: '',
+        newHeader: '',
         hunks: [{
           oldStart: 1,
           oldLines: 3,
@@ -335,6 +339,8 @@ export function generateLargeDiff(
       patch: {
         oldFileName: 'a/source.ts',
         newFileName: 'b/source.ts',
+        oldHeader: '',
+        newHeader: '',
         hunks: [{
           oldStart: 1,
           oldLines: 3,

@@ -17,8 +17,10 @@ export interface DiffHunk {
  * Represents a parsed patch with hunks
  */
 export interface DiffParsedPatch {
-  oldFileName?: string;
-  newFileName?: string;
+  oldFileName: string;
+  newFileName: string;
+  oldHeader: string;
+  newHeader: string;
   hunks: DiffHunk[];
 }
 

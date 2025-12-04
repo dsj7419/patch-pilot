@@ -65,7 +65,7 @@ export class ShiftedHeaderStrategy implements PatchStrategy {
       return { patched: content, success: false };
     }
     
-    const lines = content.split('\n');
+    const lines = content.split(/\r?\n/);
     const copy = JSON.parse(JSON.stringify(patch)) as DiffParsedPatch;
 
     // Try to shift each hunk to match content
@@ -144,7 +144,7 @@ export class GreedyStrategy implements PatchStrategy {
   
   apply(content: string, patch: DiffParsedPatch): PatchResult {
     const copy = JSON.parse(JSON.stringify(patch)) as DiffParsedPatch;
-    const fileLines = content.split('\n');
+    const fileLines = content.split(/\r?\n/);
 
     // For each hunk, modify context lines that don't match
     copy.hunks.forEach((h: DiffHunk) => {

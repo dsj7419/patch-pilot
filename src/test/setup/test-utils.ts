@@ -220,7 +220,9 @@ export function createMockParsedPatch(options: {
   return {
     oldFileName,
     newFileName,
-    hunks
+    hunks,
+    oldHeader: '', // Add default empty values to satisfy the type
+    newHeader: ''
   };
 }
 
