@@ -1,12 +1,11 @@
 const { exec } = require('child_process');
 
-// Получаем абсолютный путь к текущей папке
+// Get full path to the current folder
 const cwd = process.cwd();
 
-// Формируем команду с абсолютными путями. Кавычки нужны для путей с пробелами.
-//const command = `code --disable-extensions --extensionDevelopmentPath="${cwd}" "${cwd}"`;
+// Formcommand with full paths
+// Disable all extensions except this the develping one
 const command = `code --disable-extensions --extensionDevelopmentPath="${cwd}"`;
 
-
-// Запускаем VS Code и не ждем его закрытия (fire and forget)
+// Run VS Code 
 exec(command);

@@ -2,7 +2,7 @@
   "name": "patch-pilot",
   "displayName": "PatchPilot",
   "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.3.2",
+  "version": "2.0.0",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
@@ -138,8 +138,7 @@
     "watch:webview": "node build-webview.js --watch",
     "watch": "concurrently \"yarn watch:extension\" \"yarn watch:webview\"",
     "debug": "code --extensionDevelopmentPath=. --inspect-extensions=9229",
-    "build:dev": "node esbuild.js && node build-webview.js",
-    "watch:dev2": "yarn build:dev && concurrently \"yarn watch\" \"code  --extensionDevelopmentPath=. --disable-extensions .\"",
+    "build:dev": "node esbuild.js && node build-webview.js",    
     "open:dev": "node scripts/dev-start.js",
     "watch:dev": "yarn build:dev && yarn open:dev && yarn watch",
     "build:webview": "node build-webview.js",
