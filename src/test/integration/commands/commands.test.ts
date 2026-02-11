@@ -288,7 +288,8 @@ describe('Extension Commands', () => {
           isEmpty: false
         },
         document: {
-          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF)
+          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF),
+          uri: { scheme: 'file' }
         }
       };
       
@@ -373,7 +374,8 @@ describe('Extension Commands', () => {
           isEmpty: false
         },
         document: {
-          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF)
+          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF),
+          uri: { scheme: 'file' }
         }
       };
       
@@ -403,7 +405,8 @@ describe('Extension Commands', () => {
           isEmpty: false
         },
         document: {
-          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF)
+          getText: jest.fn().mockReturnValue(WELL_FORMED_DIFF),
+          uri: { scheme: 'file' }
         }
       };
       
