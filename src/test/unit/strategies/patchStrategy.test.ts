@@ -380,6 +380,12 @@ import {
         // Verify both strategies were tried
         expect(strategy1.apply).toHaveBeenCalledWith('original', patch);
         expect(strategy2.apply).toHaveBeenCalledWith('original', patch);
+
+        // Verify diagnostics are returned on failure
+        expect(result.diagnostics).toBeDefined();
+        expect(result.diagnostics).toContain('strategy1');
+        expect(result.diagnostics).toContain('strategy2');
+        expect(result.diagnostics).toContain('Strategies attempted');
       });
     });
   

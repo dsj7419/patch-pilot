@@ -30,6 +30,7 @@ export interface PatchResult {
   patched: string;
   success: boolean;
   strategy?: string;
+  diagnostics?: string;
 }
 
 /**
@@ -228,14 +229,34 @@ export class ChainedPatchStrategy implements PatchStrategy {
   }
   
   apply(content: string, patch: DiffParsedPatch): PatchResult {
+    const attempted: string[] = [];
     for (const strategy of this.strategies) {
+      attempted.push(strategy.name);
       const result = strategy.apply(content, patch);
       if (result.success) {
         return result;
       }
     }
+
+    // Build diagnostics on failure
+    const hunkCount = patch.hunks.length;
+    const filePath = patch.newFileName ?? patch.oldFileName ?? 'unknown';
+    const diagParts: string[] = [
+      `File: ${filePath} (${hunkCount} hunk${hunkCount !== 1 ? 's' : ''})`,
+      `Strategies attempted: ${attempted.join(' → ')}`,
+    ];
+
+    // Check if hunks contain only whitespace changes
+    const allWhitespaceOnly = patch.hunks.every(h => {
+      const adds = h.lines.filter(l => l.startsWith('+')).map(l => l.slice(1).trim());
+      const dels = h.lines.filter(l => l.startsWith('-')).map(l => l.slice(1).trim());
+      return adds.join('') === dels.join('');
+    });
+    if (allWhitespaceOnly) {
+      diagParts.push('Note: All hunks contain whitespace-only changes');
+    }
     
-    return { patched: content, success: false };
+    return { patched: content, success: false, diagnostics: diagParts.join('\n') };
   }
 }
 

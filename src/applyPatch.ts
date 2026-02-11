@@ -70,17 +70,20 @@ export async function applyPatch(
 
       const doc = await vscode.workspace.openTextDocument(fileUri);
       const original = doc.getText();
-      const { patched, success, strategy } = await applyPatchToContent(
+      const { patched, success, strategy, diagnostics } = await applyPatchToContent(
         original,
         patch,
         fuzz,
       );
 
       if (!success) {
+        const reason = diagnostics
+          ? `Patch could not be applied\n${diagnostics}`
+          : 'Patch could not be applied';
         results.push({
           file: relPath,
           status: 'failed',
-          reason: 'Patch could not be applied',
+          reason,
         });
         continue;
       }
