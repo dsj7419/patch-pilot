@@ -5,6 +5,17 @@ All notable changes to the PatchPilot extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-11
+
+### Added
+- Accept & Decline buttons replace blocking modal dialog for a non-blocking review workflow (#16)
+- Editable diff preview — edit diffs before applying to fix AI-generated errors (#16)
+- Edit hint and re-preview nudge when diff text is modified after preview
+
+### Improved
+- Non-blocking workflow: VS Code diff preview opens for visual review while confirmation happens via webview buttons
+- Clearer button styling with green Accept and red Decline using VS Code theme variables
+
 ## [1.2.6] - 2026-02-11
 
 ### Fixed

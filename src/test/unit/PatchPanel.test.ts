@@ -202,7 +202,7 @@ describe('PatchPanel', () => {
       expect(applyPatch).toHaveBeenCalledWith(
         WELL_FORMED_DIFF,
         expect.objectContaining({
-          preview: true
+          preview: false
         })
       );
     
@@ -601,6 +601,16 @@ describe('PatchPanel', () => {
       
       // Verify CSP is properly set
       expect(mockWebviewPanel.webview.html).toContain('Content-Security-Policy');
+      
+      // Verify accept/decline buttons (#16)
+      expect(mockWebviewPanel.webview.html).toContain('Accept &amp; Apply');
+      expect(mockWebviewPanel.webview.html).toContain('Decline');
+      expect(mockWebviewPanel.webview.html).toContain('btn-accept');
+      expect(mockWebviewPanel.webview.html).toContain('btn-decline');
+      
+      // Verify edit hint element (#16)
+      expect(mockWebviewPanel.webview.html).toContain('id="edit-hint"');
+      expect(mockWebviewPanel.webview.html).toContain('edit the diff');
       
       // Clean up
       PatchPanel.currentPanel?.dispose();

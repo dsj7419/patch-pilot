@@ -172,7 +172,7 @@ export class PatchPanel {
     
     try {
       const results = await applyPatch(patchText, {
-        preview: true,
+        preview: false,
         autoStage,
         fuzz: fuzz as 0|1|2|3
       });
@@ -371,10 +371,14 @@ private _getHtmlForWebview(webview: vscode.Webview): string {
         <div id="file-list" role="list" aria-label="Files affected by patch"></div>
       </section>
       
+      <div id="edit-hint" class="edit-hint hidden">
+        <span class="edit-hint-icon">✏️</span> You can edit the diff above before applying.
+      </div>
+      
       <div class="button-container" role="group" aria-label="Patch actions">
         <button id="preview-btn" class="btn primary">Preview</button>
-        <button id="apply-btn" class="btn success" disabled aria-disabled="true">Apply Patch</button>
-        <button id="cancel-btn" class="btn danger" disabled aria-disabled="true">Cancel</button>
+        <button id="apply-btn" class="btn btn-accept" disabled aria-disabled="true">✅ Accept &amp; Apply</button>
+        <button id="cancel-btn" class="btn btn-decline" disabled aria-disabled="true">❌ Decline</button>
       </div>
     </main>
     
@@ -387,7 +391,7 @@ private _getHtmlForWebview(webview: vscode.Webview): string {
     </div>
     
     <div class="footer">
-      <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and header will be automatically fixed.</p>
+      <p class="tip"><strong>Tip:</strong> Use <kbd>Ctrl+Enter</kbd> to preview the patch. AI-generated diffs with missing spaces and headers will be automatically fixed. You can edit the diff after previewing to fix any issues before applying.</p>
       <p class="tip"><strong>Tip:</strong> To create a branch for your patch, use <kbd>Ctrl+Shift+P</kbd> and search for "PatchPilot: Create Branch".</p>
     </div>
   </div>
