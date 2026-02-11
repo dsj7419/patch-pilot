@@ -1,8 +1,8 @@
 {
   "name": "patch-pilot",
   "displayName": "PatchPilot",
-  "description": "Paste fuzzy unified‑diffs & apply with AI‑grade smarts",
-  "version": "1.2.6",
+  "description": "AI-smart diff engine — paste unified diffs from ChatGPT, Copilot, or Claude and apply them with fuzzy matching, even when lines have drifted",
+  "version": "1.3.0",
   "publisher": "patchpilot",
   "engines": {
     "vscode": "^1.99.0"
@@ -17,10 +17,38 @@
     "diff",
     "git",
     "ai",
-    "llm"
+    "llm",
+    "copilot",
+    "chatgpt",
+    "claude",
+    "unified-diff",
+    "fuzzy-match"
   ],
   "aiAssisted": true,
   "icon": "media/logo.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/dsj7419/patch-pilot",
+  "qna": "https://github.com/dsj7419/patch-pilot/discussions",
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/i/patchpilot.patch-pilot?label=installs&cacheSeconds=7200",
+      "href": "https://marketplace.visualstudio.com/items?itemName=patchpilot.patch-pilot",
+      "description": "Marketplace Installs"
+    },
+    {
+      "url": "https://img.shields.io/github/stars/dsj7419/patch-pilot?style=social",
+      "href": "https://github.com/dsj7419/patch-pilot",
+      "description": "GitHub Stars"
+    },
+    {
+      "url": "https://open-vsx.org/api/patchpilot/patch-pilot/badge",
+      "href": "https://open-vsx.org/extension/patchpilot/patch-pilot",
+      "description": "Open VSX"
+    }
+  ],
   "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:diff"
