@@ -169,8 +169,10 @@ import {
   
       it('should handle a well-formed diff without changes', () => {
         const result = normalizeDiff(WELL_FORMED_DIFF);
-        // Should be mostly the same, except for potential line ending normalization
-        expect(normalizeLineEndings(result)).toBe(normalizeLineEndings(WELL_FORMED_DIFF));
+        // Should be mostly the same, except for line ending normalization and trailing whitespace stripping
+        const expected = normalizeLineEndings(WELL_FORMED_DIFF)
+          .split('\n').map(l => l.trimEnd()).join('\n');
+        expect(normalizeLineEndings(result)).toBe(expected);
       });
   
       it('should handle mixed line endings', () => {
@@ -199,6 +201,48 @@ import {
         // Original content is preserved
         expect(result).toContain('-removed line');
         expect(result).toContain('+added line');
+      });
+
+      it('should strip trailing whitespace from each line', () => {
+        const diffWithTrailingWS = [
+          'diff --git a/file.ts b/file.ts',
+          '--- a/file.ts',
+          '+++ b/file.ts',
+          '@@ -1,3 +1,3 @@',
+          ' context line   ',       // trailing spaces
+          '-old line\t',            // trailing tab
+          '+new line  \t  ',        // mixed trailing whitespace
+        ].join('\n');
+
+        const result = normalizeDiff(diffWithTrailingWS);
+        const lines = result.split('\n');
+        for (const line of lines) {
+          expect(line).toBe(line.trimEnd());
+        }
+        // Content is preserved (minus trailing ws)
+        expect(result).toContain(' context line');
+        expect(result).toContain('-old line');
+        expect(result).toContain('+new line');
+      });
+
+      it('should allow a diff with trailing-whitespace-only changes to be parsed', () => {
+        // A diff where context lines have trailing spaces pasted from an AI tool
+        const diffWithTrailingWS = [
+          'diff --git a/hello.ts b/hello.ts',
+          '--- a/hello.ts   ',
+          '+++ b/hello.ts   ',
+          '@@ -1,3 +1,3 @@   ',
+          ' const a = 1;   ',
+          '-const b = 2;   ',
+          '+const b = 3;   ',
+          ' const c = 3;   ',
+        ].join('\n');
+
+        const result = normalizeDiff(diffWithTrailingWS);
+        // After normalization, no line should have trailing whitespace
+        for (const line of result.split('\n')) {
+          expect(line).toBe(line.trimEnd());
+        }
       });
     });
   

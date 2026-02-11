@@ -5,6 +5,14 @@ All notable changes to the PatchPilot extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-02-11
+
+### Fixed
+- Patches with trailing whitespace now apply correctly (#19)
+
+### Improved
+- Better error diagnostics when patch application fails — shows strategies attempted, file path, hunk count, and whitespace-only change detection
+
 ## [1.2.2] - 2025-05-4
 
 ### Infrastructure 1.2.4

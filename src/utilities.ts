@@ -84,6 +84,9 @@ export function normalizeDiff(diffText: string): string {
   
   // Then handle escaped control characters that appear as literal strings
   normalized = normalized.replace(/\\r\\n|\\r|\\n/g, '');
+
+  // Strip trailing whitespace from each line (common in AI-generated/pasted diffs)
+  normalized = normalized.split('\n').map(line => line.trimEnd()).join('\n');
   
   normalized = autoFixSpaces(normalized);
   normalized = addMissingHeaders(normalized);
