@@ -168,7 +168,20 @@ context.subscriptions.push(
         return;
       }
       
-      const selectedText = editor.document.getText(selection);
+      // Diff view detection: can't apply from preview panes
+      const scheme = editor.document.uri.scheme;
+      if (scheme === 'patchpilot-orig' || scheme === 'patchpilot-mod') {
+        vscode.window.showInformationMessage(
+          'Apply Selected Diff works with diff text (containing +/- lines) selected in a regular editor. ' +
+          'To apply the full patch, use the Apply button in the PatchPilot panel.'
+        );
+        return;
+      }
+
+      let selectedText = editor.document.getText(selection);
+      
+      // Recover missing diff headers from document context
+      selectedText = recoverDiffHeaders(editor.document, selection, selectedText);
       
       // Track command usage
       trackEvent('command_executed', { command: 'applySelectedDiff' });
@@ -209,6 +222,65 @@ context.subscriptions.push(
       }
     })
   );
+}
+
+/**
+ * Recover missing diff headers (--- a/ and +++ b/) from the full document context
+ * when a user selects only hunks without headers.
+ */
+export function recoverDiffHeaders(
+  document: vscode.TextDocument,
+  selection: vscode.Selection,
+  selectedText: string
+): string {
+  // If the selected text already has --- and +++ headers, no recovery needed
+  if (/^---\s+[ab]?\//m.test(selectedText) && /^\+\+\+\s+[ab]?\//m.test(selectedText)) {
+    return selectedText;
+  }
+
+  // Check if the selection looks like a diff (has @@ hunks or +/- lines)
+  const looksLikeDiff = /^@@\s/m.test(selectedText) ||
+    (/^\+[^+]/m.test(selectedText) && /^-[^-]/m.test(selectedText));
+
+  if (!looksLikeDiff) {
+    return selectedText;
+  }
+
+  // Search above the selection for the nearest --- a/ and +++ b/ headers
+  const textAbove = document.getText(new vscode.Range(0, 0, selection.start.line, 0));
+  const lines = textAbove.split('\n');
+
+  let diffGitHeader: string | undefined;
+  let minusHeader: string | undefined;
+  let plusHeader: string | undefined;
+
+  // Scan backwards from the selection to find the nearest headers
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!plusHeader && /^\+\+\+\s+[ab]?\//.test(line)) {
+      plusHeader = line;
+    } else if (!minusHeader && /^---\s+[ab]?\//.test(line)) {
+      minusHeader = line;
+    } else if (!diffGitHeader && /^diff --git/.test(line)) {
+      diffGitHeader = line;
+    }
+    if (minusHeader && plusHeader) {
+      // Check if the line right above --- is a diff --git header
+      if (!diffGitHeader && i > 0 && /^diff --git/.test(lines[i - 1])) {
+        diffGitHeader = lines[i - 1];
+      }
+      break;
+    }
+  }
+
+  if (minusHeader && plusHeader) {
+    const prefix = diffGitHeader
+      ? `${diffGitHeader}\n${minusHeader}\n${plusHeader}\n`
+      : `${minusHeader}\n${plusHeader}\n`;
+    return prefix + selectedText;
+  }
+
+  return selectedText;
 }
 
 /**

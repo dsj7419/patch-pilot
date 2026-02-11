@@ -5,6 +5,12 @@ All notable changes to the PatchPilot extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-02-11
+
+### Fixed
+- "Apply Selected Diff" now recovers missing diff headers from document context when only hunks are selected (#17)
+- Informative message when running "Apply Selected Diff" from a diff preview view instead of a regular editor (#17)
+
 ## [1.2.5] - 2026-02-11
 
 ### Fixed
