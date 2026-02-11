@@ -248,22 +248,55 @@ p {
   background-color: var(--vscode-button-hoverBackground);
 }
 
-.btn.success {
-  background-color: var(--vscode-statusBarItem-prominentBackground, #388a34);
-  color: var(--vscode-statusBarItem-prominentForeground, #fff);
+.btn.success,
+.btn.btn-accept {
+  background-color: var(--vscode-testing-iconPassed, #388a34);
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 16px;
 }
 
-.btn.success:hover {
-  filter: brightness(1.1);
+.btn.success:hover,
+.btn.btn-accept:hover {
+  filter: brightness(1.15);
 }
 
-.btn.danger {
-  background-color: var(--vscode-errorForeground, #f14c4c);
-  color: white;
+.btn.danger,
+.btn.btn-decline {
+  background-color: var(--vscode-testing-iconFailed, #f14c4c);
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 16px;
 }
 
-.btn.danger:hover {
-  filter: brightness(1.1);
+.btn.danger:hover,
+.btn.btn-decline:hover {
+  filter: brightness(1.15);
+}
+
+/* Edit hint shown after preview */
+.edit-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--vscode-editorInfo-foreground, #3794ff);
+  background-color: var(--vscode-editorInfo-background, rgba(55, 148, 255, 0.1));
+  border-left: 3px solid var(--vscode-editorInfo-foreground, #3794ff);
+  border-radius: 2px;
+}
+
+.edit-hint-icon {
+  font-size: 14px;
+}
+
+/* Re-preview nudge when diff is edited after preview */
+.re-preview-nudge {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  background-color: var(--vscode-editorWarning-background, rgba(204, 167, 0, 0.1));
+  border-left-color: var(--vscode-editorWarning-foreground, #cca700);
 }
 
 .btn:disabled {

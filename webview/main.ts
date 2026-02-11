@@ -74,6 +74,7 @@ let _currentSettings: ExtensionSettings = {
   autoStage: false,
   fuzzFactor: 2
 };
+let _previewedPatchText = ''; // track the text that was last previewed
 
 /**
  * Main initialization function
@@ -135,8 +136,21 @@ function initialize() {
         vscode.setState({ patchText: text });
       }
       
-      // Reset UI if text changes
-      resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
+      // If we have an active preview and text changed, show re-preview nudge
+      const editHint = document.getElementById('edit-hint');
+      if (_previewedPatchText && text !== _previewedPatchText && !previewArea.classList.contains('hidden')) {
+        if (editHint) {
+          editHint.classList.remove('hidden');
+          editHint.classList.add('re-preview-nudge');
+          editHint.innerHTML = '<span class="edit-hint-icon">⚠️</span> Diff has been edited. Click <strong>Preview</strong> to refresh the file list, or <strong>Accept &amp; Apply</strong> to apply the current diff.';
+        }
+        // Keep buttons enabled — user can still apply edited diff
+      } else {
+        // Reset UI if no prior preview
+        if (!_previewedPatchText) {
+          resetUI(previewArea, previewBtn, applyBtn, cancelBtn, statusMessage);
+        }
+      }
     }
   });
   
@@ -211,6 +225,10 @@ function handleApplyClick(
   cancelBtn: HTMLButtonElement,
   statusMessage: HTMLDivElement
 ): void {
+  // Always read the latest text from the textarea (user may have edited it)
+  const patchInput = document.getElementById('patch-input') as HTMLTextAreaElement;
+  const latestText = patchInput ? patchInput.value.trim() : currentPatchText;
+  
   // Show loading state
   setStatus(statusMessage, 'Applying patch...', 'normal');
   applyBtn.disabled = true;
@@ -222,7 +240,7 @@ function handleApplyClick(
   if (vscode) {
     vscode.postMessage({
       command: 'applyPatch',
-      patchText: currentPatchText
+      patchText: latestText
     });
   } else {
     setStatus(statusMessage, 'VS Code API not available', 'error');
@@ -324,6 +342,16 @@ function handlePatchPreview(
   cancelBtn.disabled = false;
   cancelBtn.setAttribute('aria-disabled', 'false');
 
+  // Track what was previewed so we can detect edits
+  _previewedPatchText = currentPatchText;
+
+  // Show edit hint
+  const editHint = document.getElementById('edit-hint');
+  if (editHint) {
+    editHint.classList.remove('hidden', 're-preview-nudge');
+    editHint.innerHTML = '<span class="edit-hint-icon">✏️</span> You can edit the diff above before applying.';
+  }
+
   if (!applyShouldBeEnabled) {
     setStatus(statusMessage, 'Error: All target files not found. Cannot apply patch.', 'error');
     previewBtn.focus();
@@ -402,9 +430,17 @@ function handlePatchResults(
   if (failCount === 0) {
     patchInput.value = '';
     currentPatchText = '';
+    _previewedPatchText = '';
     if (vscode) {
       vscode.setState({ patchText: '' });
     }
+  }
+  
+  // Hide edit hint
+  const editHint = document.getElementById('edit-hint');
+  if (editHint) {
+    editHint.classList.add('hidden');
+    editHint.classList.remove('re-preview-nudge');
   }
   
   // Return focus to the textarea or preview button based on results
@@ -472,6 +508,14 @@ function resetUI(
   cancelBtn.disabled = true;
   cancelBtn.setAttribute('aria-disabled', 'true');
   setStatus(statusMessage, 'Ready to parse your unified diff.', 'normal');
+  
+  // Reset edit hint and previewed text
+  _previewedPatchText = '';
+  const editHint = document.getElementById('edit-hint');
+  if (editHint) {
+    editHint.classList.add('hidden');
+    editHint.classList.remove('re-preview-nudge');
+  }
 }
 
 // Handle message events from the extension
