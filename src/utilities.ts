@@ -86,7 +86,34 @@ export function normalizeDiff(diffText: string): string {
   normalized = normalized.replace(/\\r\\n|\\r|\\n/g, '');
 
   // Strip trailing whitespace from each line (common in AI-generated/pasted diffs)
-  normalized = normalized.split('\n').map(line => line.trimEnd()).join('\n');
+  // but preserve hunk content lines: inside a hunk, a lone space " " is a blank
+  // context line and must not be trimmed to "".
+  {
+    const lines = normalized.split('\n');
+    let inHunk = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('@@') && /@@ -\d/.test(line)) {
+        inHunk = true;
+        lines[i] = line.trimEnd();
+        continue;
+      }
+      if (inHunk && (line.startsWith('diff ') || line.startsWith('--- ') || line.startsWith('+++ '))) {
+        inHunk = false;
+      }
+      if (inHunk && (line.startsWith('+') || line.startsWith('-') || line.startsWith(' '))) {
+        // Trim trailing whitespace but preserve a lone space (blank context line)
+        const trimmed = line.trimEnd();
+        lines[i] = trimmed === '' && line.startsWith(' ') ? ' ' : trimmed;
+      } else if (inHunk && line === '') {
+        // Empty line inside a hunk is a blank context line missing its space prefix
+        lines[i] = ' ';
+      } else {
+        lines[i] = line.trimEnd();
+      }
+    }
+    normalized = lines.join('\n');
+  }
   
   normalized = autoFixSpaces(normalized);
   normalized = addMissingHeaders(normalized);

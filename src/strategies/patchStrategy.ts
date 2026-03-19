@@ -79,14 +79,14 @@ export class ShiftedHeaderStrategy implements PatchStrategy {
       }
     }
     
-    const out = DiffLib.applyPatch(content, copy);
-    return { 
-      patched: out === false ? content : out, 
+    const out = DiffLib.applyPatch(content, copy, { fuzzFactor: this.fuzzFactor });
+    return {
+      patched: out === false ? content : out,
       success: out !== false,
       strategy: out !== false ? this.name : undefined
     };
   }
-  
+
   /**
    * Locate the best position for a hunk in the file content
    * @param file Array of file lines
@@ -95,15 +95,19 @@ export class ShiftedHeaderStrategy implements PatchStrategy {
    * @returns The best line position or -1 if not found
    */
   private locateHunk(file: string[], hunk: DiffHunk, fuzz: 0 | 1 | 2 | 3): number {
-    const ctx = hunk.lines.filter((l: string) => l.startsWith(' ')).map((l: string) => l.slice(1));
-    if (ctx.length === 0) {
+    // Build the "old side" of the hunk — context lines + removed lines in order.
+    // This represents what the file should contain at the hunk position.
+    const oldLines = hunk.lines
+      .filter((l: string) => l.startsWith(' ') || l.startsWith('-'))
+      .map((l: string) => l.slice(1));
+    if (oldLines.length === 0) {
       return hunk.oldStart;
     }
 
-    // Calculate minimum number of matches needed based on fuzz
+    const nonBlankOld = oldLines.filter(l => l.trim() !== '');
     // With higher fuzz, we need fewer exact matches
-    const minMatchesNeeded = Math.max(1, Math.ceil(ctx.length / (fuzz + 1)));
-    
+    const minMatchesNeeded = Math.max(1, Math.ceil(nonBlankOld.length / (fuzz + 1)));
+
     // Search in a wider range around the expected location
     const searchRadius = 100 + (fuzz * 20); // More fuzz = wider search
     const start = Math.max(0, hunk.oldStart - searchRadius);
@@ -113,26 +117,28 @@ export class ShiftedHeaderStrategy implements PatchStrategy {
 
     for (let i = start; i < end; i++) {
       let score = 0;
-      for (let j = 0; j < ctx.length && i + j < file.length; j++) {
-        if (file[i + j] === ctx[j]) {
-          score++;
+      for (let j = 0; j < oldLines.length && i + j < file.length; j++) {
+        if (file[i + j] === oldLines[j] || file[i + j].trimEnd() === oldLines[j].trimEnd()) {
+          // Weight non-blank matches higher so blank-line matches don't dominate
+          score += (oldLines[j].trim() !== '' ? 3 : 1);
         }
       }
-      
+
       if (score > bestScore) {
-        bestScore = score; 
+        bestScore = score;
         bestPos = i;
-        if (score === ctx.length) {
-          break; // perfect match
+        // Perfect match
+        const maxScore = oldLines.length + nonBlankOld.length * 2;
+        if (score === maxScore) {
+          break;
         }
       }
     }
-    
-    // The key fix: use minMatchesNeeded instead of a hardcoded value
-    if (bestScore >= minMatchesNeeded) {
+
+    if (bestScore >= minMatchesNeeded * 3) {
       return bestPos;
     }
-    
+
     return -1;
   }
 }
@@ -142,7 +148,17 @@ export class ShiftedHeaderStrategy implements PatchStrategy {
  */
 export class GreedyStrategy implements PatchStrategy {
   readonly name = 'greedy';
-  
+  private fuzzFactor: 0 | 1 | 2 | 3;
+
+  constructor(fuzzFactor: 0 | 1 | 2 | 3 = 2) {
+    this.fuzzFactor = fuzzFactor;
+  }
+
+  /** Check if a context line matches any file line (whitespace-tolerant) */
+  private lineInFile(ctxLine: string, fileLines: string[]): boolean {
+    return fileLines.some(fl => fl === ctxLine || fl.trimEnd() === ctxLine.trimEnd());
+  }
+
   apply(content: string, patch: DiffParsedPatch): PatchResult {
     const copy = JSON.parse(JSON.stringify(patch)) as DiffParsedPatch;
     const fileLines = content.split('\n');
@@ -153,13 +169,14 @@ export class GreedyStrategy implements PatchStrategy {
       const contextLines = h.lines.filter(l => l.startsWith(' ')).map(l => l.slice(1));
       let _bestMatchPos = -1;
       let bestMatchScore = 0;
-      
+
       // Scan file for best position
       if (contextLines.length > 0) {
         for (let i = 0; i < fileLines.length; i++) {
           let score = 0;
           for (let j = 0; j < contextLines.length && i + j < fileLines.length; j++) {
-            if (fileLines[i + j] === contextLines[j]) {
+            if (fileLines[i + j] === contextLines[j] ||
+                fileLines[i + j].trimEnd() === contextLines[j].trimEnd()) {
               score++;
             }
           }
@@ -169,48 +186,48 @@ export class GreedyStrategy implements PatchStrategy {
           }
         }
       }
-      
+
       // Only filter lines if we found some matches
       if (bestMatchScore > 0) {
-        // Instead of just filtering lines that don't match, we're more aggressive
         // Keep additions/removals and only context lines that actually do match
         const keptLines: string[] = [];
-        
+
         for (const line of h.lines) {
-          if (line.startsWith('+')) {
-            // Always keep additions
-            keptLines.push(line);
-          } else if (line.startsWith('-')) {
-            // Keep removals
+          if (line.startsWith('+') || line.startsWith('-')) {
             keptLines.push(line);
           } else if (line.startsWith(' ')) {
-            // For context, only keep if it's in the file
-            const content = line.slice(1);
-            if (fileLines.includes(content)) {
+            const ctx = line.slice(1);
+            if (this.lineInFile(ctx, fileLines)) {
               keptLines.push(line);
+            }
+          } else if (line === '') {
+            // Blank line from corrupted diff — treat as blank context if file has blank lines
+            if (this.lineInFile('', fileLines)) {
+              keptLines.push(' ');
             }
           }
         }
-        
+
         h.lines = keptLines;
       } else {
         // Traditional approach as fallback
         h.lines = h.lines.filter((l: string) => {
-          return !(l.startsWith(' ') && !fileLines.includes(l.slice(1)));
+          if (l === '') { return true; } // keep blank lines
+          return !(l.startsWith(' ') && !this.lineInFile(l.slice(1), fileLines));
         });
       }
-      
+
       // Adjust hunk line counts
       const newCount = h.lines.filter((l: string) => l.startsWith('+') || l.startsWith(' ')).length;
       const oldCount = h.lines.filter((l: string) => l.startsWith('-') || l.startsWith(' ')).length;
-      
+
       h.newLines = newCount;
       h.oldLines = oldCount;
     });
 
-    const out = DiffLib.applyPatch(content, copy);
-    return { 
-      patched: out === false ? content : out, 
+    const out = DiffLib.applyPatch(content, copy, { fuzzFactor: this.fuzzFactor });
+    return {
+      patched: out === false ? content : out,
       success: out !== false,
       strategy: out !== false ? this.name : undefined
     };
@@ -275,7 +292,7 @@ export class PatchStrategyFactory {
     return new ChainedPatchStrategy([
       new StrictStrategy(),
       new ShiftedHeaderStrategy(fuzzFactor),
-      new GreedyStrategy()
+      new GreedyStrategy(fuzzFactor)
     ]);
   }
 

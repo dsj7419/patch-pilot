@@ -5,6 +5,16 @@ All notable changes to the PatchPilot extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-03-19
+
+### Fixed
+- Multi-hunk diffs failing to apply despite passing `git apply --check` (#24)
+- `normalizeDiff()` no longer destroys blank context lines (single space ` `) inside hunks; empty lines in hunks are now correctly converted to blank context lines
+- `ShiftedHeaderStrategy` now passes `fuzzFactor` to `DiffLib.applyPatch()`, enabling fuzzy context matching after hunk repositioning
+- `GreedyStrategy` now passes `fuzzFactor` to `DiffLib.applyPatch()` and accepts a configurable fuzz level
+- Hunk relocation (`locateHunk`) now matches against the full old-side of the hunk (context + removed lines) instead of only context lines, preventing false positives from blank-line matches
+- Whitespace-tolerant context matching in shifted and greedy strategies (trailing whitespace differences no longer cause failures)
+
 ## [1.3.0] - 2026-02-11
 
 ### Added

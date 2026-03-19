@@ -169,9 +169,19 @@ import {
   
       it('should handle a well-formed diff without changes', () => {
         const result = normalizeDiff(WELL_FORMED_DIFF);
-        // Should be mostly the same, except for line ending normalization and trailing whitespace stripping
-        const expected = normalizeLineEndings(WELL_FORMED_DIFF)
-          .split('\n').map(l => l.trimEnd()).join('\n');
+        // Should be mostly the same, except for line ending normalization and trailing whitespace stripping.
+        // Blank context lines (single space " ") inside hunks are preserved.
+        const lines = normalizeLineEndings(WELL_FORMED_DIFF).split('\n');
+        let inHunk = false;
+        const expected = lines.map(l => {
+          if (l.startsWith('@@') && /@@ -\d/.test(l)) { inHunk = true; return l.trimEnd(); }
+          if (inHunk && (l.startsWith('diff ') || l.startsWith('--- ') || l.startsWith('+++ '))) { inHunk = false; }
+          if (inHunk && (l.startsWith('+') || l.startsWith('-') || l.startsWith(' '))) {
+            const trimmed = l.trimEnd();
+            return trimmed === '' && l.startsWith(' ') ? ' ' : trimmed;
+          }
+          return l.trimEnd();
+        }).join('\n');
         expect(normalizeLineEndings(result)).toBe(expected);
       });
   
